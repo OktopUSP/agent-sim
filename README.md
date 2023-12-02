@@ -14,19 +14,21 @@ This repository aims to promote the development of an agent TR-369 simulator to 
     <li>
         <h4>Usage:</h4>
         <ul>
-          Load tests
-        </ul>
-        <ul>
-          Controller development without specific hardware
-        </ul>
-        <ul>
-          Simulate real-world operations
-        </ul>
-        <ul>
-          Try TR-369 without buying devices
-        </ul>
-        <ul>
-          Exploit controller vulnerabilities
+            <li>
+              Load tests
+            </li>
+            <li>
+              Controller development without specific hardware
+            </li>
+            <li>
+              Simulate real-world operations
+            </li>
+            <li>
+              Try TR-369 without buying devices
+            </li>
+            <li>
+              Exploit controller vulnerabilities
+            </li>
         </ul>
     </li>
 </ul>
