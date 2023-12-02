@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="287452008-f6f81676-0ec9-422c-b120-3171569fbb85](https://github.com/OktopUSP/agent-sim/assets/83298718/c9a6347d-4576-4ae1-a1ba-7a0c28883855"/>
+    <img src="https://github.com/OktopUSP/agent-sim/assets/83298718/c9a6347d-4576-4ae1-a1ba-7a0c28883855"/>
 </p>
 <br/>
 <ul>
