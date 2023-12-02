@@ -1,5 +1,7 @@
 package simulator
 
+import "log"
+
 type MTP int
 
 const (
@@ -9,7 +11,7 @@ const (
 )
 
 func StartDeviceSimulator(mtp MTP, id int, pre string) {
-
+	log.Printf("Device: %s-%v", pre, id)
 }
 
 /*
