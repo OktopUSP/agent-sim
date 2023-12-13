@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/OktopUSP/agent-sim/internal/config"
 	"github.com/OktopUSP/agent-sim/internal/simulator"
 	"github.com/joho/godotenv"
 )
@@ -48,28 +49,12 @@ func main() {
 
 	flSimNum := flag.Int("sim_number", lookupEnvOrInt("SIM_NUM", 1), "Number of simulated devices")
 	flNumToStartIds := flag.Int("num_to_start_ids", lookupEnvOrInt("NUM_TO_START_IDS", 0), "From where to start your IDs")
-	flMtp := flag.String("protocol", lookupEnvOrString("MTP", "mqtt"), "MTP to use (mqtt, stomp, websockets)")
+	flMtp := flag.String("protocol", lookupEnvOrString("MTP", ""), "MTP to use (mqtt, stomp, websockets)")
+	flAddr := flag.String("addr", lookupEnvOrString("ADDR", "localhost"), "Address of the broker/server")
+	flPort := flag.String("port", lookupEnvOrString("PORT", "1883"), "Port of the broker/server")
+	flPath := flag.String("path", lookupEnvOrString("PATH", ""), "Folder path to save configurations")
 	flPrefix := flag.String("prefix", lookupEnvOrString("PREFIX", "oktopus"), "Prefix of device id")
 	flHelp := flag.Bool("help", false, "Help")
-
-	var mtp simulator.MTP
-	switch *flMtp {
-	case "mqtt":
-		mtp = simulator.Mqtt
-	case "stomp":
-		mtp = simulator.Stomp
-	case "websockets":
-		mtp = simulator.Websockets
-	default:
-		log.Printf("Incorrect MTP parameter: %s", *flMtp)
-		os.Exit(0)
-	}
-
-	stopCounting := *flSimNum + *flNumToStartIds
-
-	for i := *flNumToStartIds; i < stopCounting; i++ {
-		go simulator.StartDeviceSimulator(mtp, i, *flPrefix)
-	}
 
 	flag.Parse()
 
@@ -77,6 +62,18 @@ func main() {
 		flag.Usage()
 		os.Exit(0)
 	}
+
+	conf := config.NewConfig(
+		*flSimNum,
+		*flNumToStartIds,
+		*flPrefix,
+		*flAddr,
+		*flPort,
+		*flMtp,
+		*flPath,
+	)
+
+	simulator.StartDeviceSimulator(conf)
 
 	<-done
 	log.Println("(⌐■_■) Agent simulator is out!")
@@ -100,13 +97,13 @@ func lookupEnvOrInt(key string, defaultVal int) int {
 	return defaultVal
 }
 
-func lookupEnvOrBool(key string, defaultVal bool) bool {
-	if val, _ := os.LookupEnv(key); val != "" {
-		v, err := strconv.ParseBool(val)
-		if err != nil {
-			log.Fatalf("LookupEnvOrBool[%s]: %v", key, err)
-		}
-		return v
-	}
-	return defaultVal
-}
+// func lookupEnvOrBool(key string, defaultVal bool) bool {
+// 	if val, _ := os.LookupEnv(key); val != "" {
+// 		v, err := strconv.ParseBool(val)
+// 		if err != nil {
+// 			log.Fatalf("LookupEnvOrBool[%s]: %v", key, err)
+// 		}
+// 		return v
+// 	}
+// 	return defaultVal
+// }

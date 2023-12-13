@@ -1,95 +1,96 @@
 package simulator
 
-import "log"
+import (
+	"log"
+	"os"
 
-type MTP int
+	"github.com/OktopUSP/agent-sim/internal/config"
+)
+
+type agentSim interface {
+	start(int, string, string)
+}
+
+type mtp int
 
 const (
-	Mqtt MTP = iota
+	Mqtt mtp = iota
 	Stomp
 	Websockets
 )
 
-func StartDeviceSimulator(mtp MTP, id int, pre string) {
-	log.Printf("Device: %s-%v", pre, id)
+const DEFAULT_DIR = "/configs"
+
+func StartDeviceSimulator(c config.Config) {
+
+	mtp := getMtp(c.Mtp)
+	dir := getDir(c.Path)
+
+	var agent_sim agentSim
+
+	switch mtp {
+	case Mqtt:
+		mqtt := newMqtt(c)
+		agent_sim = &mqtt
+	case Stomp:
+		log.Println("Stomp not implemented yet")
+		os.Exit(0)
+		//StartStompDevice(i, pre)
+	case Websockets:
+		log.Println("Websockets not implemented yet")
+		os.Exit(0)
+		//StartWebsocketsDevice(i, pre)
+	}
+
+	stopCounting := c.SimNumber + c.NumToStartId
+
+	for i := c.NumToStartId; i < stopCounting; i++ {
+		go agent_sim.start(i, c.Prefix, dir)
+	}
+
 }
 
-/*
+func getMtp(mtp_config string) mtp {
 
-#
-# This file contains a factory reset database in text format
-#
-# If no USP database exists when OB-USP-AGENT starts, then OB-USP-AGENT will create a database containing
-# the parameters specified in a text file located by the '-r' option.
-# Example:
-#    obuspa -p -v 4 -r factory_reset_example.txt
-#
-# Each line of this file contains either a comment (denoted by '#' at the start of the line)
-# or a USP data model parameter and its factory reset value.
-# The parameter and value are separated by whitespace.
-# The value may optionally be enclosed in speech marks "" (this is the only way to specify an empty string)
-#
-##########################################################################################################
-#
-# Adding MQTT parameters to test the datamodel interface
-#
+	var mtp mtp
 
-Device.LocalAgent.EndpointID "oktopus-agent-test"
+	switch mtp_config {
+	case "mqtt":
+		mtp = Mqtt
+	case "stomp":
+		mtp = Stomp
+	case "websockets":
+		mtp = Websockets
+	case "":
+		log.Println("MTP not defined")
+		os.Exit(1)
+	default:
+		log.Println("Invalid MTP")
+		os.Exit(1)
+	}
 
+	return mtp
+}
 
-## Adding boot params
-Device.LocalAgent.Controller.1.BootParameter.1.Enable true
-Device.LocalAgent.Controller.1.BootParameter.1.ParameterName "Device.LocalAgent.EndpointID"
-Device.LocalAgent.Subscription.1.Alias cpe-1
-Device.LocalAgent.Subscription.1.Enable true
-Device.LocalAgent.Subscription.1.ID default-boot-event-ACS
-Device.LocalAgent.Subscription.1.Recipient Device.LocalAgent.Controller.1
-Device.LocalAgent.Subscription.1.NotifType Event
-Device.LocalAgent.Subscription.1.ReferenceList Device.Boot!
-Device.LocalAgent.Subscription.1.Persistent true
+func getDir(path string) string {
 
-Device.LocalAgent.MTP.1.MQTT.ResponseTopicConfigured "oktopus/v1/controller"
-Device.LocalAgent.MTP.1.MQTT.Reference "Device.MQTT.Client.1"
-Device.MQTT.Client.1.BrokerAddress "localhost"
-Device.MQTT.Client.1.ProtocolVersion "5.0"
-Device.MQTT.Client.1.BrokerPort "1883"
-Device.MQTT.Client.1.TransportProtocol "TCP/IP"
-Device.MQTT.Client.1.Username ""
-Device.MQTT.Client.1.Password ""
-Device.MQTT.Client.1.Alias "cpe-1"
-Device.MQTT.Client.1.Enable true
-Device.MQTT.Client.1.ClientID ""
-Device.MQTT.Client.1.KeepAliveTime "60"
+	checkPathExists := func(dir string) {
+		_, err := os.Stat(dir)
+		if err != nil {
+			log.Printf("Path: %s does not exist", path)
+			os.Exit(1)
+		}
+	}
 
-Device.MQTT.Client.1.ConnectRetryTime "5"
-Device.MQTT.Client.1.ConnectRetryIntervalMultiplier   "2000"
-Device.MQTT.Client.1.ConnectRetryMaxInterval "60"
+	if path == "" {
+		path, _ = os.Getwd()
+		path = path + DEFAULT_DIR
+		log.Printf(
+			"Path not defined, using current directory: %s",
+			path,
+		)
+	}
 
-
-Device.LocalAgent.Controller.1.Alias "cpe-1"
-Device.LocalAgent.Controller.1.Enable true
-Device.LocalAgent.Controller.1.PeriodicNotifInterval "86400"
-Device.LocalAgent.Controller.1.PeriodicNotifTime "0001-01-01T00:00:00Z"
-Device.LocalAgent.Controller.1.ControllerCode ""
-Device.LocalAgent.Controller.1.MTP.1.Alias "cpe-1"
-Device.LocalAgent.Controller.1.MTP.1.Enable true
-Device.LocalAgent.Controller.1.MTP.1.Protocol "MQTT"
-Device.LocalAgent.Controller.1.EndpointID "oktopusController"
-Device.LocalAgent.Controller.1.MTP.1.MQTT.Reference "Device.MQTT.Client.1"
-Device.LocalAgent.Controller.1.MTP.1.MQTT.Topic "oktopus/v1/controller"
-
-
-
-#
-# The following parameters may be modified
-#
-Device.LocalAgent.MTP.1.Alias "cpe-1"
-Device.LocalAgent.MTP.1.Enable true
-Device.LocalAgent.MTP.1.Protocol "MQTT"
-
-Internal.Reboot.Cause "LocalFactoryReset"
-
-
-
-
-*/
+	checkPathExists(path)
+	return path
+}
