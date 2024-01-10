@@ -6,6 +6,8 @@ import (
 	"strconv"
 )
 
+const DOCKER_IMG_NAME = "obuspa:latest"
+
 func LookupEnvOrString(key string, defaultVal string) string {
 	if val, _ := os.LookupEnv(key); val != "" {
 		return val

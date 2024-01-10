@@ -55,6 +55,7 @@ func main() {
 	flAddr := flag.String("addr", utils.LookupEnvOrString("ADDR", "localhost"), "Address of the broker/server")
 	flPort := flag.String("port", utils.LookupEnvOrString("PORT", "1883"), "Port of the broker/server")
 	flPath := flag.String("path", utils.LookupEnvOrString("PATH", ""), "Folder path to save configurations")
+	flImgPath := flag.String("imgpath", utils.LookupEnvOrString("DOCKERFILE_PATH", ""), "Path to Dockerfile")
 	flPrefix := flag.String("prefix", utils.LookupEnvOrString("PREFIX", "oktopus"), "Prefix of device id")
 	flHelp := flag.Bool("help", false, "Help")
 
@@ -67,7 +68,7 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	dockerCli, err := container.CreateDockerClient()
+	cli, err := container.CreateDockerClient()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -80,13 +81,22 @@ func main() {
 		*flPort,
 		*flMtp,
 		*flPath,
+		/* ----------------------------- Docker Configs ----------------------------- */
 		ctx,
+		cli,
+		*flImgPath,
+		/* -------------------------------------------------------------------------- */
 	)
 
 	simulator.StartDeviceSimulator(conf)
 
 	<-done
+
+	/* ----------------------------- Stop Gracefully ---------------------------- */
 	cancel()
+	conf.Wg.Wait()
+	cli.Close()
+	/* -------------------------------------------------------------------------- */
 
 	log.Println("(⌐■_■) Agent simulator is out!")
 }

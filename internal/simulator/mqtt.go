@@ -1,33 +1,41 @@
 package simulator
 
 import (
-	"bufio"
-	"fmt"
+	"context"
 	"log"
 	"os"
-	"os/exec"
 	"strconv"
+	"sync"
 
 	"github.com/OktopUSP/agent-sim/internal/config"
+	"github.com/OktopUSP/agent-sim/internal/container"
+	"github.com/OktopUSP/agent-sim/internal/utils"
+	"github.com/docker/docker/client"
 )
 
 type MqttProtocol struct {
 	Addr string
 	Port string
 	Ssl  bool
+	Wg   *sync.WaitGroup
+	Ctx  context.Context
+	Cli  *client.Client
 }
 
 func newMqtt(c config.Config) MqttProtocol {
 	return MqttProtocol{
 		Addr: c.Address,
 		Port: c.Port,
+		Ctx:  c.Ctx,
+		Wg:   c.Wg,
+		Cli:  c.Docker.Cli,
 	}
 }
 
 func (m *MqttProtocol) start(id int, pre string, dir string) {
 	log.Printf("Device: %s-%v", pre, id)
 	file := createMqttFileConfig(id, pre, dir, m.Port, m.Addr)
-	startMqttAgent(file, pre, strconv.Itoa(id))
+	m.startMqttAgent(file, pre, strconv.Itoa(id))
 }
 
 func createMqttFileConfig(id int, pre string, dir, port, addr string) string {
@@ -117,40 +125,27 @@ Internal.Reboot.Cause "LocalFactoryReset"
 	return dir + "/" + pre + "-" + strconv.Itoa(id) + "-mqtt.txt"
 }
 
-func startMqttAgent(file, pre, id string) {
+func (m *MqttProtocol) startMqttAgent(file, pre, id string) {
+	id, err := container.RunDockerContainer(
+		m.Ctx,
+		m.Cli,
+		utils.DOCKER_IMG_NAME,
+		pre+"-"+id+"-"+"mqtt",
+		file,
+	)
 
-	//TODO: run all agents in a container
-
-	cmd := exec.Command("/usr/local/bin/obuspa", "-p", "-v", "4", "-i", "lo", "-r", file)
-
-	// Create pipes to capture command output
-	stdout, _ := cmd.StdoutPipe()
-	stderr, _ := cmd.StderrPipe()
-
-	// Start the command
-	if err := cmd.Start(); err != nil {
-		fmt.Println("Error starting command:", err)
-		return
+	if err != nil {
+		log.Println(err)
 	}
 
-	// Create a scanner for command output
-	stdoutScanner := bufio.NewScanner(stdout)
-	stderrScanner := bufio.NewScanner(stderr)
+	<-m.Ctx.Done()
 
-	// Use goroutines to read and print output in real-time
-	go printOutput(stdoutScanner, pre+"-"+id+"-"+"mqtt")
-	go printOutput(stderrScanner, pre+"-"+id+"-"+"mqtt")
-
-	// Wait for the command to finish
-	if err := cmd.Wait(); err != nil {
-		fmt.Println("Error waiting for command:", err)
-		return
+	err = container.DeleteDockerContainer(context.TODO(), m.Cli, id)
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Printf("Deleted docker mqtt container: %s", id)
 	}
-}
 
-// printOutput reads lines from the scanner and prints them with a prefix
-func printOutput(scanner *bufio.Scanner, prefix string) {
-	for scanner.Scan() {
-		fmt.Printf("[%s] %s\n", prefix, scanner.Text())
-	}
+	m.Wg.Done()
 }

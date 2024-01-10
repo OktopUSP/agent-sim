@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/OktopUSP/agent-sim/internal/config"
+	"github.com/OktopUSP/agent-sim/internal/container"
+	"github.com/OktopUSP/agent-sim/internal/utils"
 )
 
 type agentSim interface {
@@ -24,9 +26,14 @@ const DEFAULT_DIR = "/configs"
 func StartDeviceSimulator(c config.Config) {
 
 	mtp := getMtp(c.Mtp)
-	dir := getDir(c.Path)
+	fileConfigDir := getDir(c.Path)
 
 	var agent_sim agentSim
+
+	err := container.BuildDockerImage(c.Ctx, c.Docker.Cli, utils.DOCKER_IMG_NAME, c.Docker.ImgPath)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	switch mtp {
 	case Mqtt:
@@ -45,7 +52,8 @@ func StartDeviceSimulator(c config.Config) {
 	stopCounting := c.SimNumber + c.NumToStartId
 
 	for i := c.NumToStartId; i < stopCounting; i++ {
-		go agent_sim.start(i, c.Prefix, dir)
+		c.Wg.Add(1)
+		go agent_sim.start(i, c.Prefix, fileConfigDir)
 	}
 
 }
