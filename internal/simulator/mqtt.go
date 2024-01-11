@@ -16,6 +16,8 @@ import (
 type MqttProtocol struct {
 	Addr string
 	Port string
+	User string
+	Pass string
 	Ssl  bool
 	Wg   *sync.WaitGroup
 	Ctx  context.Context
@@ -23,22 +25,33 @@ type MqttProtocol struct {
 }
 
 func newMqtt(c config.Config) MqttProtocol {
+
+	log.Println("Create new agent(s) with mqtt protocol")
+	log.Printf("Mqtt client config: %++v", c.Mqtt)
+
 	return MqttProtocol{
-		Addr: c.Address,
-		Port: c.Port,
-		Ctx:  c.Ctx,
-		Wg:   c.Wg,
-		Cli:  c.Docker.Cli,
+		/* ----------------------- Mqtt connection parameters ----------------------- */
+		Addr: c.Mqtt.Addr,
+		Port: c.Mqtt.Port,
+		User: c.Mqtt.User,
+		Pass: c.Mqtt.Pass,
+		Ssl:  c.Mqtt.Ssl,
+		/* -------------------------------------------------------------------------- */
+		Ctx: c.Ctx,
+		Wg:  c.Wg,
+		Cli: c.Docker.Cli,
 	}
 }
 
 func (m *MqttProtocol) start(id int, pre string, dir string) {
 	log.Printf("Device: %s-%v", pre, id)
-	file := createMqttFileConfig(id, pre, dir, m.Port, m.Addr)
+	file := createMqttFileConfig(id, pre, dir, *m)
 	m.startMqttAgent(file, pre, strconv.Itoa(id))
 }
 
-func createMqttFileConfig(id int, pre string, dir, port, addr string) string {
+func createMqttFileConfig(id int, pre, dir string, m MqttProtocol) string {
+	//TODO: create ssl agent option
+	//TODO: create mqqt client version
 	err := os.WriteFile(
 		dir+"/"+pre+"-"+strconv.Itoa(id)+"-mqtt.txt",
 		[]byte(`
@@ -76,12 +89,12 @@ Device.LocalAgent.Subscription.1.Persistent true
 
 Device.LocalAgent.MTP.1.MQTT.ResponseTopicConfigured "oktopus/v1/controller"
 Device.LocalAgent.MTP.1.MQTT.Reference "Device.MQTT.Client.1"
-Device.MQTT.Client.1.BrokerAddress "`+addr+`"
+Device.MQTT.Client.1.BrokerAddress "`+m.Addr+`"
 Device.MQTT.Client.1.ProtocolVersion "5.0"
-Device.MQTT.Client.1.BrokerPort "`+port+`"
+Device.MQTT.Client.1.BrokerPort "`+m.Port+`"
 Device.MQTT.Client.1.TransportProtocol "TCP/IP"
-Device.MQTT.Client.1.Username ""
-Device.MQTT.Client.1.Password ""
+Device.MQTT.Client.1.Username "`+m.User+`"
+Device.MQTT.Client.1.Password "`+m.Pass+`"
 Device.MQTT.Client.1.Alias "cpe-1"
 Device.MQTT.Client.1.Enable true
 Device.MQTT.Client.1.ClientID ""

@@ -52,8 +52,11 @@ func main() {
 	flSimNum := flag.Int("sim_number", utils.LookupEnvOrInt("SIM_NUM", 1), "Number of simulated devices")
 	flNumToStartIds := flag.Int("num_to_start_ids", utils.LookupEnvOrInt("NUM_TO_START_IDS", 0), "From where to start your IDs")
 	flMtp := flag.String("protocol", utils.LookupEnvOrString("MTP", ""), "MTP to use (mqtt, stomp, websockets)")
-	flAddr := flag.String("addr", utils.LookupEnvOrString("ADDR", "localhost"), "Address of the broker/server")
-	flPort := flag.String("port", utils.LookupEnvOrString("PORT", "1883"), "Port of the broker/server")
+	flMqttAddr := flag.String("mqtt_addr", utils.LookupEnvOrString("MQTT_ADDR", "localhost"), "Address of the mqtt broker")
+	flMqttPort := flag.String("mqtt_port", utils.LookupEnvOrString("MQTT_PORT", "1883"), "Port of the mqtt broker")
+	flMqttUser := flag.String("mqtt_user", utils.LookupEnvOrString("MQTT_USER", ""), "Mqtt user")
+	flMqttPasswd := flag.String("mqtt_passwd", utils.LookupEnvOrString("MQTT_PASSWD", ""), "Mqtt password")
+	flMqttSsl := flag.Bool("mqtt_ssl", utils.LookupEnvOrBool("MQTT_SSL", false), "Mqtt with tls/ssl")
 	flPath := flag.String("path", utils.LookupEnvOrString("PATH", ""), "Folder path to save configurations")
 	flImgPath := flag.String("imgpath", utils.LookupEnvOrString("DOCKERFILE_PATH", ""), "Path to Dockerfile")
 	flPrefix := flag.String("prefix", utils.LookupEnvOrString("PREFIX", "oktopus"), "Prefix of device id")
@@ -77,14 +80,20 @@ func main() {
 		*flSimNum,
 		*flNumToStartIds,
 		*flPrefix,
-		*flAddr,
-		*flPort,
 		*flMtp,
 		*flPath,
 		/* ----------------------------- Docker Configs ----------------------------- */
 		ctx,
 		cli,
 		*flImgPath,
+		/* -------------------------------------------------------------------------- */
+
+		/* ------------------------------ Mqtt Configs ------------------------------ */
+		*flMqttUser,
+		*flMqttPasswd,
+		*flMqttSsl,
+		*flMqttAddr,
+		*flMqttPort,
 		/* -------------------------------------------------------------------------- */
 	)
 
