@@ -95,6 +95,9 @@ func RunDockerContainer(
 				Target: "/etc/factory_reset_example.txt",
 			},
 		},
+		ExtraHosts: []string{
+			"host.docker.internal:host-gateway",
+		},
 	}
 
 	containerConfig := container.Config{
