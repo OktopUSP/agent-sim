@@ -44,9 +44,8 @@ func StartDeviceSimulator(c config.Config) {
 		os.Exit(0)
 		//StartStompDevice(i, pre)
 	case Websockets:
-		log.Println("Websockets not implemented yet")
-		os.Exit(0)
-		//StartWebsocketsDevice(i, pre)
+		ws := newWs(c)
+		agent_sim = &ws
 	}
 
 	stopCounting := c.SimNumber + c.NumToStartId

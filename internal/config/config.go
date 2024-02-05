@@ -17,6 +17,7 @@ type Config struct {
 	Wg           *sync.WaitGroup
 	Docker       Docker
 	Mqtt         Mqtt
+	WebSockets   WebSockets
 }
 
 type Docker struct {
@@ -30,6 +31,13 @@ type Mqtt struct {
 	User string
 	Pass string
 	Ssl  bool
+}
+
+type WebSockets struct {
+	Addr  string
+	Port  string
+	Route string
+	Ssl   bool
 }
 
 func NewConfig(
@@ -46,6 +54,10 @@ func NewConfig(
 	mqttSsl bool,
 	mqttAddr string,
 	mqttPort string,
+	wsAddr string,
+	wsPort string,
+	flWsRoute string,
+	wsSsl bool,
 ) Config {
 	return Config{
 		SimNumber:    simNumber,
@@ -65,6 +77,12 @@ func NewConfig(
 			User: mqttUser,
 			Pass: mqttPass,
 			Ssl:  mqttSsl,
+		},
+		WebSockets: WebSockets{
+			Addr:  wsAddr,
+			Port:  wsPort,
+			Route: flWsRoute,
+			Ssl:   wsSsl,
 		},
 	}
 }

@@ -57,6 +57,10 @@ func main() {
 	flMqttUser := flag.String("mqtt_user", utils.LookupEnvOrString("MQTT_USER", ""), "Mqtt user")
 	flMqttPasswd := flag.String("mqtt_passwd", utils.LookupEnvOrString("MQTT_PASSWD", ""), "Mqtt password")
 	flMqttSsl := flag.Bool("mqtt_ssl", utils.LookupEnvOrBool("MQTT_SSL", false), "Mqtt with tls/ssl")
+	flWsAddr := flag.String("ws_addr", utils.LookupEnvOrString("WS_ADDR", "localhost"), "Address of the websockets server")
+	flWsPort := flag.String("ws_port", utils.LookupEnvOrString("WS_PORT", "8080"), "Port of the websockets server")
+	flWsRoute := flag.String("ws_route", utils.LookupEnvOrString("WS_ROUTE", "/ws/agent"), "Route of the websockets server")
+	flWsSsl := flag.Bool("ws_ssl", utils.LookupEnvOrBool("WS_SSL", false), "Websockets with tls/ssl")
 	flPath := flag.String("path", utils.LookupEnvOrString("PATH", ""), "Folder path to save configurations")
 	flImgPath := flag.String("imgpath", utils.LookupEnvOrString("DOCKERFILE_PATH", ""), "Path to Dockerfile")
 	flPrefix := flag.String("prefix", utils.LookupEnvOrString("PREFIX", "oktopus"), "Prefix of device id")
@@ -94,6 +98,13 @@ func main() {
 		*flMqttSsl,
 		*flMqttAddr,
 		*flMqttPort,
+		/* -------------------------------------------------------------------------- */
+
+		/* ------------------------------ Websockets Configs ------------------------ */
+		*flWsAddr,
+		*flWsPort,
+		*flWsRoute,
+		*flWsSsl,
 		/* -------------------------------------------------------------------------- */
 	)
 
