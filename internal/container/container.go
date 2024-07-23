@@ -101,15 +101,24 @@ func RunDockerContainer(
 	}
 
 	containerConfig := container.Config{
-		Image: imageName,
-		Cmd:   []string{"obuspa", "-p", "-v", "4", "-r", "/etc/factory_reset_example.txt"},
+		Image: "oktopusp/obuspa:latest",
+		Cmd:   []string{"obuspa", "-p", "-v4", "-i", "lo", "-r", "/etc/factory_reset_example.txt"},
 		Tty:   true,
 	}
+
+	// var networking_config *network.NetworkingConfig
+	// networking_config = &network.NetworkingConfig{
+	// 	EndpointsConfig: map[string]*network.EndpointSettings{
+	// 		"compose_usp_network": {
+	// 			IPAMConfig: &network.EndpointIPAMConfig{
+	// 				IPv4Address: "172.16.235.222"}}},
+	// }
 
 	resp, err := cli.ContainerCreate(
 		ctx,
 		&containerConfig,
 		&hostConfig,
+		// networking_config,
 		nil,
 		nil,
 		containerName,
