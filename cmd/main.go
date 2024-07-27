@@ -60,8 +60,9 @@ func main() {
 	flWsAddr := flag.String("ws_addr", utils.LookupEnvOrString("WS_ADDR", "localhost"), "Address of the websockets server")
 	flWsPort := flag.String("ws_port", utils.LookupEnvOrString("WS_PORT", "8080"), "Port of the websockets server")
 	flWsRoute := flag.String("ws_route", utils.LookupEnvOrString("WS_ROUTE", "/ws/agent"), "Route of the websockets server")
+	flBridgeName := flag.String("br_name", utils.LookupEnvOrString("BR_NAME", "bridge"), "Bridge name of docker network")
 	flWsSsl := flag.Bool("ws_ssl", utils.LookupEnvOrBool("WS_SSL", false), "Websockets with tls/ssl")
-	flPath := flag.String("path", utils.LookupEnvOrString("PATH", ""), "Folder path to save configurations")
+	flPath := flag.String("path", utils.LookupEnvOrString("PATH", "/Users/chiesa/oktupus/agent-sim/configs"), "Folder path to save configurations")
 	flImgPath := flag.String("imgpath", utils.LookupEnvOrString("DOCKERFILE_PATH", ""), "Path to Dockerfile")
 	flPrefix := flag.String("prefix", utils.LookupEnvOrString("PREFIX", "oktopus"), "Prefix of device id")
 	flHelp := flag.Bool("help", false, "Help")
@@ -73,7 +74,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	// ctx, cancel := context.WithCancel(context.Background())
+
+	ctx := context.Background()
 
 	cli, err := container.CreateDockerClient()
 	if err != nil {
@@ -90,6 +93,7 @@ func main() {
 		ctx,
 		cli,
 		*flImgPath,
+		*flBridgeName,
 		/* -------------------------------------------------------------------------- */
 
 		/* ------------------------------ Mqtt Configs ------------------------------ */
@@ -108,14 +112,18 @@ func main() {
 		/* -------------------------------------------------------------------------- */
 	)
 
+	conf.Path = "/home/ubuntu/configs"
+	// conf.Path = "/Users/chiesa/oktupus/agent-sim/configs"
+	log.Println(conf.Path)
+
 	simulator.StartDeviceSimulator(conf)
 
-	<-done
+	// <-done
 
 	/* ----------------------------- Stop Gracefully ---------------------------- */
-	cancel()
+	// cancel()
 	conf.Wg.Wait()
-	cli.Close()
+	// cli.Close()
 	/* -------------------------------------------------------------------------- */
 
 	log.Println("(⌐■_■) Agent simulator is out!")

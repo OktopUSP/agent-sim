@@ -16,6 +16,7 @@ type Config struct {
 	Ctx          context.Context
 	Wg           *sync.WaitGroup
 	Docker       Docker
+	BrName       string
 	Mqtt         Mqtt
 	WebSockets   WebSockets
 }
@@ -49,6 +50,7 @@ func NewConfig(
 	ctx context.Context,
 	dockerCli *client.Client,
 	dockerImgPath string,
+	flBridgeName string,
 	mqttUser string,
 	mqttPass string,
 	mqttSsl bool,
@@ -71,6 +73,7 @@ func NewConfig(
 			Cli:     dockerCli,
 			ImgPath: dockerImgPath,
 		},
+		BrName: flBridgeName,
 		Mqtt: Mqtt{
 			Addr: mqttAddr,
 			Port: mqttPort,

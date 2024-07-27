@@ -3,14 +3,14 @@ package simulator
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/OktopUSP/agent-sim/internal/config"
 	"github.com/OktopUSP/agent-sim/internal/container"
-	"github.com/OktopUSP/agent-sim/internal/utils"
 )
 
 type agentSim interface {
-	start(int, string, string)
+	start(int, string, string, string)
 }
 
 type mtp int
@@ -30,7 +30,12 @@ func StartDeviceSimulator(c config.Config) {
 
 	var agent_sim agentSim
 
-	err := container.BuildDockerImage(c.Ctx, c.Docker.Cli, utils.DOCKER_IMG_NAME, c.Docker.ImgPath)
+	// err := container.BuildDockerImage(c.Ctx, c.Docker.Cli, utils.DOCKER_IMG_NAME, c.Docker.ImgPath)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	err := container.DownloadDockerImage(c.Ctx, c.Docker.Cli)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -52,7 +57,8 @@ func StartDeviceSimulator(c config.Config) {
 
 	for i := c.NumToStartId; i < stopCounting; i++ {
 		c.Wg.Add(1)
-		go agent_sim.start(i, c.Prefix, fileConfigDir)
+		go agent_sim.start(i, c.Prefix, c.BrName, fileConfigDir)
+		time.Sleep(time.Duration(100) * time.Millisecond)
 	}
 
 }

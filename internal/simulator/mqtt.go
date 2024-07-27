@@ -43,10 +43,10 @@ func newMqtt(c config.Config) MqttProtocol {
 	}
 }
 
-func (m *MqttProtocol) start(id int, pre string, dir string) {
+func (m *MqttProtocol) start(id int, pre string, br string, dir string) {
 	log.Printf("Device: %s-%v", pre, id)
 	file := createMqttFileConfig(id, pre, dir, *m)
-	m.startMqttAgent(file, pre, strconv.Itoa(id))
+	m.startMqttAgent(file, pre, br, strconv.Itoa(id))
 }
 
 func createMqttFileConfig(id int, pre, dir string, m MqttProtocol) string {
@@ -138,11 +138,12 @@ Internal.Reboot.Cause "LocalFactoryReset"
 	return dir + "/" + pre + "-" + strconv.Itoa(id) + "-mqtt.txt"
 }
 
-func (m *MqttProtocol) startMqttAgent(file, pre, id string) {
+func (m *MqttProtocol) startMqttAgent(file, pre, br, id string) {
 	id, err := container.RunDockerContainer(
 		m.Ctx,
 		m.Cli,
 		utils.DOCKER_IMG_NAME,
+		br,
 		pre+"-"+id+"-"+"mqtt",
 		file,
 	)
@@ -150,6 +151,8 @@ func (m *MqttProtocol) startMqttAgent(file, pre, id string) {
 	if err != nil {
 		log.Println(err)
 	}
+
+	m.Wg.Done()
 
 	<-m.Ctx.Done()
 

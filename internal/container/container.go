@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 )
 
@@ -78,10 +79,20 @@ func BuildDockerImage(ctx context.Context, cli *client.Client, imageName string,
 	return nil
 }
 
+func DownloadDockerImage(ctx context.Context, cli *client.Client) error {
+	reader, err := cli.ImagePull(ctx, "oktopusp/obuspa:latest", types.ImagePullOptions{})
+	if err != nil {
+		return err
+	}
+	io.Copy(os.Stdout, reader)
+	return nil
+}
+
 func RunDockerContainer(
 	ctx context.Context,
 	cli *client.Client,
 	imageName string,
+	bridgeName string,
 	containerName string,
 	confBind string,
 ) (string, error) {
@@ -102,24 +113,22 @@ func RunDockerContainer(
 
 	containerConfig := container.Config{
 		Image: "oktopusp/obuspa:latest",
-		Cmd:   []string{"obuspa", "-p", "-v4", "-i", "lo", "-r", "/etc/factory_reset_example.txt"},
-		Tty:   true,
+		// Image: imageName,
+		Cmd: []string{"obuspa", "-p", "-v4", "-i", "lo", "-r", "/etc/factory_reset_example.txt"},
+		Tty: true,
 	}
 
-	// var networking_config *network.NetworkingConfig
-	// networking_config = &network.NetworkingConfig{
-	// 	EndpointsConfig: map[string]*network.EndpointSettings{
-	// 		"compose_usp_network": {
-	// 			IPAMConfig: &network.EndpointIPAMConfig{
-	// 				IPv4Address: "172.16.235.222"}}},
-	// }
+	var networking_config *network.NetworkingConfig
+	networking_config = &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			bridgeName: {}},
+	}
 
 	resp, err := cli.ContainerCreate(
 		ctx,
 		&containerConfig,
 		&hostConfig,
-		// networking_config,
-		nil,
+		networking_config,
 		nil,
 		containerName,
 	)

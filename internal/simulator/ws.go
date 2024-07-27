@@ -41,10 +41,10 @@ func newWs(c config.Config) WsProtocol {
 	}
 }
 
-func (w *WsProtocol) start(id int, pre string, dir string) {
+func (w *WsProtocol) start(id int, pre string, br string, dir string) {
 	log.Printf("Device: %s-%v", pre, id)
 	file := createWsFileConfig(id, pre, dir, *w)
-	w.startWsAgent(file, pre, strconv.Itoa(id))
+	w.startWsAgent(file, pre, br, strconv.Itoa(id))
 }
 
 func createWsFileConfig(id int, pre, dir string, w WsProtocol) string {
@@ -119,11 +119,12 @@ Internal.Reboot.Cause "LocalFactoryReset"
 	return dir + "/" + pre + "-" + strconv.Itoa(id) + "-websockets.txt"
 }
 
-func (w *WsProtocol) startWsAgent(file, pre, id string) {
+func (w *WsProtocol) startWsAgent(file, pre, br, id string) {
 	id, err := container.RunDockerContainer(
 		w.Ctx,
 		w.Cli,
 		utils.DOCKER_IMG_NAME,
+		br,
 		pre+"-"+id+"-"+"websockets",
 		file,
 	)
