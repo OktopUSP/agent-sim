@@ -62,7 +62,13 @@ func main() {
 	flWsRoute := flag.String("ws_route", utils.LookupEnvOrString("WS_ROUTE", "/ws/agent"), "Route of the websockets server")
 	flBridgeName := flag.String("br_name", utils.LookupEnvOrString("BR_NAME", "bridge"), "Bridge name of docker network")
 	flWsSsl := flag.Bool("ws_ssl", utils.LookupEnvOrBool("WS_SSL", false), "Websockets with tls/ssl")
-	flPath := flag.String("path", utils.LookupEnvOrString("PATH", "/Users/chiesa/oktupus/agent-sim/configs"), "Folder path to save configurations")
+	flStompAddr := flag.String("stomp_addr", utils.LookupEnvOrString("STOMP_ADDR", "localhost"), "Address of the stomp broker")
+	flStompPort := flag.String("stomp_port", utils.LookupEnvOrString("STOMP_PORT", "61613"), "Port of the stomp broker")
+	flStompUser := flag.String("stomp_user", utils.LookupEnvOrString("STOMP_USER", ""), "Stomp user")
+	flStompPasswd := flag.String("stomp_passwd", utils.LookupEnvOrString("STOMP_PASSWD", ""), "Stomp password")
+	flStompSsl := flag.Bool("stomp_ssl", utils.LookupEnvOrBool("STOMP_SSL", false), "Stomp with tls/ssl")
+
+	flPath := flag.String("path", utils.LookupEnvOrString("PATH", ""), "Folder path to save configurations")
 	flImgPath := flag.String("imgpath", utils.LookupEnvOrString("DOCKERFILE_PATH", ""), "Path to Dockerfile")
 	flPrefix := flag.String("prefix", utils.LookupEnvOrString("PREFIX", "oktopus"), "Prefix of device id")
 	flHelp := flag.Bool("help", false, "Help")
@@ -74,9 +80,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	// ctx, cancel := context.WithCancel(context.Background())
-
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 
 	cli, err := container.CreateDockerClient()
 	if err != nil {
@@ -110,20 +114,27 @@ func main() {
 		*flWsRoute,
 		*flWsSsl,
 		/* -------------------------------------------------------------------------- */
+
+		/* ------------------------------ Stomp Configs ----------------------------- */
+		*flStompAddr,
+		*flStompPort,
+		*flStompUser,
+		*flStompPasswd,
+		*flStompSsl,
+		/* -------------------------------------------------------------------------- */
 	)
 
-	conf.Path = "/home/ubuntu/configs"
-	// conf.Path = "/Users/chiesa/oktupus/agent-sim/configs"
-	log.Println(conf.Path)
+	go simulator.StartDeviceSimulator(conf)
 
-	simulator.StartDeviceSimulator(conf)
-
-	// <-done
+	<-done
+	log.Println("Received signal to stop the simulator")
 
 	/* ----------------------------- Stop Gracefully ---------------------------- */
-	// cancel()
+	cancel()
+	log.Println("Waiting for all agents to stop")
 	conf.Wg.Wait()
-	// cli.Close()
+
+	cli.Close()
 	/* -------------------------------------------------------------------------- */
 
 	log.Println("(⌐■_■) Agent simulator is out!")

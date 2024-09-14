@@ -45,9 +45,8 @@ func StartDeviceSimulator(c config.Config) {
 		mqtt := newMqtt(c)
 		agent_sim = &mqtt
 	case Stomp:
-		log.Println("Stomp not implemented yet")
-		os.Exit(0)
-		//StartStompDevice(i, pre)
+		stomp := newStomp(c)
+		agent_sim = &stomp
 	case Websockets:
 		ws := newWs(c)
 		agent_sim = &ws

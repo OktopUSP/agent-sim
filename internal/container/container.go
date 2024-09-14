@@ -91,10 +91,11 @@ func DownloadDockerImage(ctx context.Context, cli *client.Client) error {
 func RunDockerContainer(
 	ctx context.Context,
 	cli *client.Client,
-	imageName string,
-	bridgeName string,
-	containerName string,
-	confBind string,
+	imageName,
+	bridgeName,
+	containerName,
+	confBind,
+	tlsBind string,
 ) (string, error) {
 
 	hostConfig := container.HostConfig{
@@ -113,9 +114,18 @@ func RunDockerContainer(
 
 	containerConfig := container.Config{
 		Image: "oktopusp/obuspa:latest",
-		// Image: imageName,
-		Cmd: []string{"obuspa", "-p", "-v4", "-i", "lo", "-r", "/etc/factory_reset_example.txt"},
+		// Cmd:   []string{"obuspa", "-p", "-v4", "-i", "lo", "-r", "/etc/factory_reset_example.txt"},
+		Cmd: []string{"obuspa", "-p", "-v4", "-r", "/etc/factory_reset_example.txt"},
 		Tty: true,
+	}
+
+	if tlsBind != "" {
+		containerConfig.Cmd = append(containerConfig.Cmd, "-t", "/etc/chain.pem")
+		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
+			Type:   mount.TypeBind,
+			Source: tlsBind,
+			Target: "/etc/chain.pem",
+		})
 	}
 
 	var networking_config *network.NetworkingConfig
@@ -145,13 +155,13 @@ func RunDockerContainer(
 }
 
 func DeleteDockerContainer(ctx context.Context, cli *client.Client, containerName string) error {
-	//log.Printf("Stopping docker container: %s ...", containerName)
+	log.Printf("Stopping docker container: %s ...", containerName)
 	err := stopDockerContainer(ctx, cli, containerName)
 	if err != nil {
 		return err
 	}
 
-	//log.Printf("Removing docker container: %s ...", containerName)
+	log.Printf("Removing docker container: %s ...", containerName)
 	err = removeDockerContainer(ctx, cli, containerName)
 	if err != nil {
 		return err

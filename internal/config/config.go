@@ -19,6 +19,7 @@ type Config struct {
 	BrName       string
 	Mqtt         Mqtt
 	WebSockets   WebSockets
+	Stomp        Stomp
 }
 
 type Docker struct {
@@ -41,6 +42,14 @@ type WebSockets struct {
 	Ssl   bool
 }
 
+type Stomp struct {
+	Addr   string
+	Port   string
+	User   string
+	Passwd string
+	Ssl    bool
+}
+
 func NewConfig(
 	simNumber int,
 	numToStartId int,
@@ -60,6 +69,11 @@ func NewConfig(
 	wsPort string,
 	flWsRoute string,
 	wsSsl bool,
+	stompAddr string,
+	stompPort string,
+	stompUser string,
+	stompPasswd string,
+	stompSsl bool,
 ) Config {
 	return Config{
 		SimNumber:    simNumber,
@@ -86,6 +100,13 @@ func NewConfig(
 			Port:  wsPort,
 			Route: flWsRoute,
 			Ssl:   wsSsl,
+		},
+		Stomp: Stomp{
+			Addr:   stompAddr,
+			Port:   stompPort,
+			User:   stompUser,
+			Passwd: stompPasswd,
+			Ssl:    stompSsl,
 		},
 	}
 }

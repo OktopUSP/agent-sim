@@ -127,6 +127,7 @@ func (w *WsProtocol) startWsAgent(file, pre, br, id string) {
 		br,
 		pre+"-"+id+"-"+"websockets",
 		file,
+		"",
 	)
 
 	if err != nil {

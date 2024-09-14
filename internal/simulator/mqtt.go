@@ -146,13 +146,12 @@ func (m *MqttProtocol) startMqttAgent(file, pre, br, id string) {
 		br,
 		pre+"-"+id+"-"+"mqtt",
 		file,
+		"",
 	)
 
 	if err != nil {
 		log.Println(err)
 	}
-
-	m.Wg.Done()
 
 	<-m.Ctx.Done()
 
