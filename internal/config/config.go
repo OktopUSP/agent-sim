@@ -20,6 +20,15 @@ type Config struct {
 	Mqtt         Mqtt
 	WebSockets   WebSockets
 	Stomp        Stomp
+	BareMetal    BareMetal
+}
+
+type BareMetal struct {
+	Enable            bool
+	ExecutablePath    string
+	EthernetInterface string
+	CleanDb           bool
+	LogToStdout       bool
 }
 
 type Docker struct {
@@ -74,6 +83,11 @@ func NewConfig(
 	stompUser string,
 	stompPasswd string,
 	stompSsl bool,
+	bareMetal bool,
+	ethernetInterface string,
+	executablePath string,
+	cleanDb bool,
+	logToStdout bool,
 ) Config {
 	return Config{
 		SimNumber:    simNumber,
@@ -107,6 +121,13 @@ func NewConfig(
 			User:   stompUser,
 			Passwd: stompPasswd,
 			Ssl:    stompSsl,
+		},
+		BareMetal: BareMetal{
+			Enable:            bareMetal,
+			EthernetInterface: ethernetInterface,
+			ExecutablePath:    executablePath,
+			CleanDb:           cleanDb,
+			LogToStdout:       logToStdout,
 		},
 	}
 }

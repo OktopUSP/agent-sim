@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
-	"strconv"
+	"os/exec"
 	"sync"
 
 	"github.com/OktopUSP/agent-sim/internal/config"
@@ -14,19 +14,20 @@ import (
 )
 
 type WsProtocol struct {
-	Addr  string
-	Port  string
-	Route string
-	Ssl   bool
-	Wg    *sync.WaitGroup
-	Ctx   context.Context
-	Cli   *client.Client
+	Addr      string
+	Port      string
+	Route     string
+	Ssl       bool
+	Wg        *sync.WaitGroup
+	Ctx       context.Context
+	Cli       *client.Client
+	BareMetal config.BareMetal
 }
 
 func newWs(c config.Config) WsProtocol {
 
 	log.Println("Create new agent(s) with websockets protocol")
-	log.Printf("Websockets client config: %++v", c.Mqtt)
+	log.Printf("Websockets client config: %++v", c.WebSockets)
 
 	return WsProtocol{
 		/* ----------------------- Websockets connection parameters ----------------------- */
@@ -35,22 +36,89 @@ func newWs(c config.Config) WsProtocol {
 		Route: c.WebSockets.Route,
 		Ssl:   c.WebSockets.Ssl,
 		/* -------------------------------------------------------------------------- */
-		Ctx: c.Ctx,
-		Wg:  c.Wg,
-		Cli: c.Docker.Cli,
+		Ctx:       c.Ctx,
+		Wg:        c.Wg,
+		Cli:       c.Docker.Cli,
+		BareMetal: c.BareMetal,
 	}
 }
 
-func (w *WsProtocol) start(id int, pre string, br string, dir string) {
-	log.Printf("Device: %s-%v", pre, id)
-	file := createWsFileConfig(id, pre, dir, *w)
-	w.startWsAgent(file, pre, br, strconv.Itoa(id))
+func (w *WsProtocol) startAgentBareMetal(id, pre, br, dir string) {
+	configFile := createWsFileConfig(id, pre, dir, *w)
+	dbFile := dir + "/db-" + pre + "-" + id + ".db"
+
+	args := []string{
+		"-p",
+		"-v", "4",
+		"-r", configFile,
+		"-f", dbFile,
+		"-i", w.BareMetal.EthernetInterface,
+	}
+
+	if w.Ssl {
+		sslFile := dir + "/chain.pem"
+		args = append(args, "-t")
+		args = append(args, sslFile)
+	}
+
+	cmd := exec.CommandContext(w.Ctx, w.BareMetal.ExecutablePath, args...)
+
+	if w.BareMetal.LogToStdout {
+		cmd.Stdout = os.Stdout
+	}
+
+	err := cmd.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		log.Println(err)
+	}
+
+	if w.BareMetal.CleanDb {
+		err = os.Remove(dbFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	w.Wg.Done()
 }
 
-func createWsFileConfig(id int, pre, dir string, w WsProtocol) string {
+func (w *WsProtocol) startAgentDocker(id, pre, br, dir string) {
+	file := createWsFileConfig(id, pre, dir, *w)
+	id, err := container.RunDockerContainer(
+		w.Ctx,
+		w.Cli,
+		utils.DOCKER_IMG_NAME,
+		br,
+		pre+"-"+id+"-"+"websockets",
+		file,
+		"",
+	)
+
+	if err != nil {
+		log.Println(err)
+	}
+
+	<-w.Ctx.Done()
+
+	err = container.DeleteDockerContainer(context.TODO(), w.Cli, id)
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Printf("Deleted docker websockets container: %s", id)
+	}
+
+	w.Wg.Done()
+}
+
+func createWsFileConfig(id string, pre, dir string, w WsProtocol) string {
 	//TODO: create ssl agent option
 	err := os.WriteFile(
-		dir+"/"+pre+"-"+strconv.Itoa(id)+"-websockets.txt",
+		dir+"/"+pre+"-"+id+"-websockets.txt",
 		[]byte(`
 ##########################################################################################################
 #
@@ -72,7 +140,7 @@ func createWsFileConfig(id int, pre, dir string, w WsProtocol) string {
 # The following parameters will definitely need modifying
 #
 
-Device.LocalAgent.EndpointID "`+pre+"-"+strconv.Itoa(id)+`-ws"
+Device.LocalAgent.EndpointID "`+pre+"-"+id+`-ws"
 
 # Controller's websocket server (for agent initiated sessions)
 Device.LocalAgent.Controller.1.EndpointID "oktopusController"
@@ -102,7 +170,7 @@ Device.LocalAgent.Controller.1.PeriodicNotifTime "0001-01-01T00:00:00Z"
 Device.LocalAgent.Controller.1.USPNotifRetryMinimumWaitInterval "5"
 Device.LocalAgent.Controller.1.USPNotifRetryIntervalMultiplier "2000"
 Device.LocalAgent.Controller.1.ControllerCode ""
-Device.LocalAgent.Controller.1.MTP.1.Alias "`+pre+strconv.Itoa(id)+`"
+Device.LocalAgent.Controller.1.MTP.1.Alias "`+pre+id+`"
 Device.LocalAgent.Controller.1.MTP.1.Enable "true"
 Device.LocalAgent.Controller.1.MTP.1.Protocol "WebSocket"
 Device.LocalAgent.Controller.1.MTP.1.WebSocket.KeepAliveInterval "30"
@@ -116,32 +184,5 @@ Internal.Reboot.Cause "LocalFactoryReset"
 		log.Fatal("Error to create config file: ", err)
 	}
 
-	return dir + "/" + pre + "-" + strconv.Itoa(id) + "-websockets.txt"
-}
-
-func (w *WsProtocol) startWsAgent(file, pre, br, id string) {
-	id, err := container.RunDockerContainer(
-		w.Ctx,
-		w.Cli,
-		utils.DOCKER_IMG_NAME,
-		br,
-		pre+"-"+id+"-"+"websockets",
-		file,
-		"",
-	)
-
-	if err != nil {
-		log.Println(err)
-	}
-
-	<-w.Ctx.Done()
-
-	err = container.DeleteDockerContainer(context.TODO(), w.Cli, id)
-	if err != nil {
-		log.Println(err)
-	} else {
-		log.Printf("Deleted docker websockets container: %s", id)
-	}
-
-	w.Wg.Done()
+	return dir + "/" + pre + "-" + id + "-websockets.txt"
 }

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 
@@ -12,11 +13,12 @@ import (
 	"github.com/OktopUSP/agent-sim/internal/container"
 	"github.com/OktopUSP/agent-sim/internal/simulator"
 	"github.com/OktopUSP/agent-sim/internal/utils"
+	"github.com/docker/docker/client"
 	"github.com/joho/godotenv"
 )
 
 const FILENAME = "oktopus-agent-sim"
-const VERSION = "0.0.1"
+const VERSION = "0.1.1"
 
 func main() {
 	done := make(chan os.Signal, 1)
@@ -67,7 +69,11 @@ func main() {
 	flStompUser := flag.String("stomp_user", utils.LookupEnvOrString("STOMP_USER", ""), "Stomp user")
 	flStompPasswd := flag.String("stomp_passwd", utils.LookupEnvOrString("STOMP_PASSWD", ""), "Stomp password")
 	flStompSsl := flag.Bool("stomp_ssl", utils.LookupEnvOrBool("STOMP_SSL", false), "Stomp with tls/ssl")
-
+	flBareMetal := flag.Bool("bare_metal", utils.LookupEnvOrBool("BARE_METAL", false), "Run simulator in bare metal")
+	flEthernetInterface := flag.String("ethernet_interface", utils.LookupEnvOrString("ETH_INTERFACE", "eth0"), "Ethernet interface to use for obuspa connections")
+	flExecutablePath := flag.String("executable_path", utils.LookupEnvOrString("EXECUTABLE_PATH", "/usr/local/bin/obuspa"), "Path to obuspa executable")
+	flCleanDb := flag.Bool("clean_db", utils.LookupEnvOrBool("CLEAN_DB", false), "Clean obuspa database at the end of execution")
+	flLogToStdout := flag.Bool("log_to_stdout", utils.LookupEnvOrBool("LOG_TO_STDOUT", false), "Log to stdout")
 	flPath := flag.String("path", utils.LookupEnvOrString("PATH", ""), "Folder path to save configurations")
 	flImgPath := flag.String("imgpath", utils.LookupEnvOrString("DOCKERFILE_PATH", ""), "Path to Dockerfile")
 	flPrefix := flag.String("prefix", utils.LookupEnvOrString("PREFIX", "oktopus"), "Prefix of device id")
@@ -82,9 +88,18 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	cli, err := container.CreateDockerClient()
-	if err != nil {
-		log.Fatal(err)
+	var cli *client.Client
+
+	if !*flBareMetal {
+		cli, err = container.CreateDockerClient()
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		err = exec.Command("/usr/local/bin/obuspa", "-h").Run()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	conf := config.NewConfig(
@@ -122,6 +137,13 @@ func main() {
 		*flStompPasswd,
 		*flStompSsl,
 		/* -------------------------------------------------------------------------- */
+
+		/* ------------------------------ Bare Metal Configs ------------------------ */
+		*flBareMetal,
+		*flEthernetInterface,
+		*flExecutablePath,
+		*flCleanDb,
+		*flLogToStdout,
 	)
 
 	go simulator.StartDeviceSimulator(conf)
@@ -134,7 +156,9 @@ func main() {
 	log.Println("Waiting for all agents to stop")
 	conf.Wg.Wait()
 
-	cli.Close()
+	if !*flBareMetal {
+		cli.Close()
+	}
 	/* -------------------------------------------------------------------------- */
 
 	log.Println("(⌐■_■) Agent simulator is out!")

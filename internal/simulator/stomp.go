@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/exec"
 	"strconv"
 	"sync"
 
@@ -14,14 +15,15 @@ import (
 )
 
 type StompProtocol struct {
-	Addr   string
-	Port   string
-	User   string
-	Passwd string
-	Ssl    bool
-	Wg     *sync.WaitGroup
-	Ctx    context.Context
-	Cli    *client.Client
+	Addr      string
+	Port      string
+	User      string
+	Passwd    string
+	Ssl       bool
+	Wg        *sync.WaitGroup
+	Ctx       context.Context
+	Cli       *client.Client
+	BareMetal config.BareMetal
 }
 
 func newStomp(c config.Config) StompProtocol {
@@ -36,17 +38,58 @@ func newStomp(c config.Config) StompProtocol {
 		Passwd: c.Stomp.Passwd,
 		Ssl:    c.Stomp.Ssl,
 		/* -------------------------------------------------------------------------- */
-		Ctx: c.Ctx,
-		Wg:  c.Wg,
-		Cli: c.Docker.Cli,
+		Ctx:       c.Ctx,
+		Wg:        c.Wg,
+		Cli:       c.Docker.Cli,
+		BareMetal: c.BareMetal,
 	}
 }
 
-func (s *StompProtocol) start(id int, pre string, br string, dir string) {
-	log.Printf("Device: %s-%v", pre, id)
+func (s *StompProtocol) startAgentBareMetal(id string, pre, br, dir string) {
+	configFile := createStompFileConfig(id, pre, dir, *s)
+	dbFile := dir + "/db-" + pre + "-" + id + ".db"
+
+	args := []string{
+		"-p",
+		"-v", "4",
+		"-r", configFile,
+		"-f", dbFile,
+		"-i", s.BareMetal.EthernetInterface,
+	}
+
+	if s.Ssl {
+		sslFile := dir + "/chain.pem"
+		args = append(args, "-t")
+		args = append(args, sslFile)
+	}
+
+	cmd := exec.CommandContext(s.Ctx, s.BareMetal.ExecutablePath, args...)
+
+	if s.BareMetal.LogToStdout {
+		cmd.Stdout = os.Stdout
+	}
+
+	err := cmd.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		log.Println(err)
+	}
+
+	if s.BareMetal.CleanDb {
+		err = os.Remove(dbFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func (s *StompProtocol) startAgentDocker(id string, pre, br, dir string) {
 	file := createStompFileConfig(id, pre, dir, *s)
 
-	//TODO: set ssl file path dinamically through environment variables
 	sslFile := ""
 	if s.Ssl {
 		if s.Ssl {
@@ -55,86 +98,6 @@ func (s *StompProtocol) start(id int, pre string, br string, dir string) {
 		log.Println("SSL enabled")
 		log.Println("SSL file path:", sslFile)
 	}
-
-	s.startStompAgent(file, pre, br, strconv.Itoa(id), sslFile)
-}
-
-func createStompFileConfig(id int, pre, dir string, s StompProtocol) string {
-	err := os.WriteFile(
-		dir+"/"+pre+"-"+strconv.Itoa(id)+"-stomp.txt",
-		[]byte(`
-##########################################################################################################
-#
-# This file contains a factory reset database in text format
-#
-# If no USP database exists when OB-USP-AGENT starts, then OB-USP-AGENT will create a database containing
-# the parameters specified in a text file located by the '-r' option.
-# Example:
-#    obuspa -p -v 4 -r factory_reset_example.txt
-#
-# Each line of this file contains either a comment (denoted by '#' at the start of the line)
-# or a USP data model parameter and its factory reset value.
-# The parameter and value are separated by whitespace.
-# The value may optionally be enclosed in speech marks "" (this is the only way to specify an empty string)
-#
-##########################################################################################################
-
-Device.LocalAgent.EndpointID "`+pre+"-"+strconv.Itoa(id)+`-stomp"
-
-#
-# The following parameters will definitely need modifying
-#
-Device.LocalAgent.Controller.1.EndpointID "oktopusController"
-Device.STOMP.Connection.1.Host "`+s.Addr+`"
-Device.STOMP.Connection.1.Username "`+s.User+`"
-Device.STOMP.Connection.1.Password "`+s.Passwd+`"
-
-#
-# The following parameters may be modified
-#
-Device.LocalAgent.MTP.1.Alias "`+pre+strconv.Itoa(id)+`"
-Device.LocalAgent.MTP.1.Enable "true"
-Device.LocalAgent.MTP.1.Protocol "STOMP"
-Device.LocalAgent.MTP.1.STOMP.Reference "Device.STOMP.Connection.1"
-Device.LocalAgent.MTP.1.STOMP.Destination "oktopus/usp/v1/agent"
-Device.LocalAgent.Controller.1.Alias "cpe-1"
-Device.LocalAgent.Controller.1.Enable "true"
-Device.LocalAgent.Controller.1.AssignedRole "Device.LocalAgent.ControllerTrust.Role.1"
-Device.LocalAgent.Controller.1.PeriodicNotifInterval "300"
-Device.LocalAgent.Controller.1.PeriodicNotifTime "0001-01-01T00:00:00Z"
-Device.LocalAgent.Controller.1.USPNotifRetryMinimumWaitInterval "5"
-Device.LocalAgent.Controller.1.USPNotifRetryIntervalMultiplier "2000"
-Device.LocalAgent.Controller.1.ControllerCode ""
-Device.LocalAgent.Controller.1.MTP.1.Alias "`+pre+strconv.Itoa(id)+`"
-Device.LocalAgent.Controller.1.MTP.1.Enable "true"
-Device.LocalAgent.Controller.1.MTP.1.Protocol "STOMP"
-Device.LocalAgent.Controller.1.MTP.1.STOMP.Reference "Device.STOMP.Connection.1"
-Device.LocalAgent.Controller.1.MTP.1.STOMP.Destination "controller-notify-dest"
-Device.STOMP.Connection.1.Alias "cpe-1"
-Device.STOMP.Connection.1.Enable "true"
-Device.STOMP.Connection.1.Port "`+s.Port+`"
-Device.STOMP.Connection.1.EnableEncryption "false"
-Device.STOMP.Connection.1.VirtualHost "/"
-Device.STOMP.Connection.1.EnableHeartbeats "true"
-Device.STOMP.Connection.1.OutgoingHeartbeat "30000"
-Device.STOMP.Connection.1.IncomingHeartbeat "300000"
-Device.STOMP.Connection.1.ServerRetryInitialInterval "60"
-Device.STOMP.Connection.1.ServerRetryIntervalMultiplier "2000"
-Device.STOMP.Connection.1.ServerRetryMaxInterval "30720"
-Device.DeviceInfo.SerialNumber "`+pre+"-"+strconv.Itoa(id)+`"
-Device.STOMP.Connection.1.EnableEncryption "`+strconv.FormatBool(s.Ssl)+`"
-Internal.Reboot.Cause "LocalFactoryReset"
-		`),
-		0644,
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return dir + "/" + pre + "-" + strconv.Itoa(id) + "-stomp.txt"
-}
-
-func (s *StompProtocol) startStompAgent(file, pre, br, id, sslFile string) {
 
 	id, err := container.RunDockerContainer(
 		s.Ctx,
@@ -160,4 +123,79 @@ func (s *StompProtocol) startStompAgent(file, pre, br, id, sslFile string) {
 	}
 
 	s.Wg.Done()
+}
+
+func createStompFileConfig(id string, pre, dir string, s StompProtocol) string {
+	err := os.WriteFile(
+		dir+"/"+pre+"-"+id+"-stomp.txt",
+		[]byte(`
+##########################################################################################################
+#
+# This file contains a factory reset database in text format
+#
+# If no USP database exists when OB-USP-AGENT starts, then OB-USP-AGENT will create a database containing
+# the parameters specified in a text file located by the '-r' option.
+# Example:
+#    obuspa -p -v 4 -r factory_reset_example.txt
+#
+# Each line of this file contains either a comment (denoted by '#' at the start of the line)
+# or a USP data model parameter and its factory reset value.
+# The parameter and value are separated by whitespace.
+# The value may optionally be enclosed in speech marks "" (this is the only way to specify an empty string)
+#
+##########################################################################################################
+
+Device.LocalAgent.EndpointID "`+pre+"-"+id+`-stomp"
+
+#
+# The following parameters will definitely need modifying
+#
+Device.LocalAgent.Controller.1.EndpointID "oktopusController"
+Device.STOMP.Connection.1.Host "`+s.Addr+`"
+Device.STOMP.Connection.1.Username "`+s.User+`"
+Device.STOMP.Connection.1.Password "`+s.Passwd+`"
+
+#
+# The following parameters may be modified
+#
+Device.LocalAgent.MTP.1.Alias "`+pre+id+`"
+Device.LocalAgent.MTP.1.Enable "true"
+Device.LocalAgent.MTP.1.Protocol "STOMP"
+Device.LocalAgent.MTP.1.STOMP.Reference "Device.STOMP.Connection.1"
+Device.LocalAgent.MTP.1.STOMP.Destination "oktopus/usp/v1/agent"
+Device.LocalAgent.Controller.1.Alias "cpe-1"
+Device.LocalAgent.Controller.1.Enable "true"
+Device.LocalAgent.Controller.1.AssignedRole "Device.LocalAgent.ControllerTrust.Role.1"
+Device.LocalAgent.Controller.1.PeriodicNotifInterval "300"
+Device.LocalAgent.Controller.1.PeriodicNotifTime "0001-01-01T00:00:00Z"
+Device.LocalAgent.Controller.1.USPNotifRetryMinimumWaitInterval "5"
+Device.LocalAgent.Controller.1.USPNotifRetryIntervalMultiplier "2000"
+Device.LocalAgent.Controller.1.ControllerCode ""
+Device.LocalAgent.Controller.1.MTP.1.Alias "`+pre+id+`"
+Device.LocalAgent.Controller.1.MTP.1.Enable "true"
+Device.LocalAgent.Controller.1.MTP.1.Protocol "STOMP"
+Device.LocalAgent.Controller.1.MTP.1.STOMP.Reference "Device.STOMP.Connection.1"
+Device.LocalAgent.Controller.1.MTP.1.STOMP.Destination "controller-notify-dest"
+Device.STOMP.Connection.1.Alias "cpe-1"
+Device.STOMP.Connection.1.Enable "true"
+Device.STOMP.Connection.1.Port "`+s.Port+`"
+Device.STOMP.Connection.1.EnableEncryption "false"
+Device.STOMP.Connection.1.VirtualHost "/"
+Device.STOMP.Connection.1.EnableHeartbeats "true"
+Device.STOMP.Connection.1.OutgoingHeartbeat "30000"
+Device.STOMP.Connection.1.IncomingHeartbeat "300000"
+Device.STOMP.Connection.1.ServerRetryInitialInterval "60"
+Device.STOMP.Connection.1.ServerRetryIntervalMultiplier "2000"
+Device.STOMP.Connection.1.ServerRetryMaxInterval "30720"
+Device.DeviceInfo.SerialNumber "`+pre+"-"+id+`"
+Device.STOMP.Connection.1.EnableEncryption "`+strconv.FormatBool(s.Ssl)+`"
+Internal.Reboot.Cause "LocalFactoryReset"
+		`),
+		0644,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return dir + "/" + pre + "-" + id + "-stomp.txt"
 }

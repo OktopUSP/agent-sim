@@ -23,3 +23,8 @@ go.work
 
 # Generated obuspa configs
 *.txt
+
+# Generated obuspa db
+*.db
+
+*.pem

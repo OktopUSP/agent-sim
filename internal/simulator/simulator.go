@@ -3,14 +3,15 @@ package simulator
 import (
 	"log"
 	"os"
-	"time"
+	"strconv"
 
 	"github.com/OktopUSP/agent-sim/internal/config"
 	"github.com/OktopUSP/agent-sim/internal/container"
 )
 
 type agentSim interface {
-	start(int, string, string, string)
+	startAgentDocker(string, string, string, string)
+	startAgentBareMetal(string, string, string, string)
 }
 
 type mtp int
@@ -28,38 +29,50 @@ func StartDeviceSimulator(c config.Config) {
 	mtp := getMtp(c.Mtp)
 	fileConfigDir := getDir(c.Path)
 
-	var agent_sim agentSim
-
-	// err := container.BuildDockerImage(c.Ctx, c.Docker.Cli, utils.DOCKER_IMG_NAME, c.Docker.ImgPath)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	err := container.DownloadDockerImage(c.Ctx, c.Docker.Cli)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	switch mtp {
-	case Mqtt:
-		mqtt := newMqtt(c)
-		agent_sim = &mqtt
-	case Stomp:
-		stomp := newStomp(c)
-		agent_sim = &stomp
-	case Websockets:
-		ws := newWs(c)
-		agent_sim = &ws
-	}
+	agent_sim := getAgentSim(mtp, c)
 
 	stopCounting := c.SimNumber + c.NumToStartId
 
-	for i := c.NumToStartId; i < stopCounting; i++ {
-		c.Wg.Add(1)
-		go agent_sim.start(i, c.Prefix, c.BrName, fileConfigDir)
-		time.Sleep(time.Duration(100) * time.Millisecond)
+	if c.BareMetal.Enable {
+
+		for i := c.NumToStartId; i < stopCounting; i++ {
+			c.Wg.Add(1)
+			go agent_sim.startAgentBareMetal(strconv.Itoa(i), c.Prefix, c.BrName, fileConfigDir)
+			// time.Sleep(time.Duration(100) * time.Millisecond)
+		}
+
+	} else {
+
+		err := container.DownloadDockerImage(c.Ctx, c.Docker.Cli)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for i := c.NumToStartId; i < stopCounting; i++ {
+			c.Wg.Add(1)
+			go agent_sim.startAgentDocker(strconv.Itoa(i), c.Prefix, c.BrName, fileConfigDir)
+			// time.Sleep(time.Duration(100) * time.Millisecond)
+		}
+
 	}
 
+}
+
+func getAgentSim(mtp mtp, c config.Config) agentSim {
+	switch mtp {
+	case Mqtt:
+		mqtt := newMqtt(c)
+		return &mqtt
+	case Stomp:
+		stomp := newStomp(c)
+		return &stomp
+	case Websockets:
+		ws := newWs(c)
+		return &ws
+	default:
+		log.Fatal("Invalid MTP")
+		return nil
+	}
 }
 
 func getMtp(mtp_config string) mtp {

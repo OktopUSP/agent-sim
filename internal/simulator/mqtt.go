@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
-	"strconv"
+	"os/exec"
 	"sync"
 
 	"github.com/OktopUSP/agent-sim/internal/config"
@@ -14,14 +14,15 @@ import (
 )
 
 type MqttProtocol struct {
-	Addr string
-	Port string
-	User string
-	Pass string
-	Ssl  bool
-	Wg   *sync.WaitGroup
-	Ctx  context.Context
-	Cli  *client.Client
+	Addr      string
+	Port      string
+	User      string
+	Pass      string
+	Ssl       bool
+	Wg        *sync.WaitGroup
+	Ctx       context.Context
+	Cli       *client.Client
+	BareMetal config.BareMetal
 }
 
 func newMqtt(c config.Config) MqttProtocol {
@@ -37,23 +38,90 @@ func newMqtt(c config.Config) MqttProtocol {
 		Pass: c.Mqtt.Pass,
 		Ssl:  c.Mqtt.Ssl,
 		/* -------------------------------------------------------------------------- */
-		Ctx: c.Ctx,
-		Wg:  c.Wg,
-		Cli: c.Docker.Cli,
+		Ctx:       c.Ctx,
+		Wg:        c.Wg,
+		Cli:       c.Docker.Cli,
+		BareMetal: c.BareMetal,
 	}
 }
 
-func (m *MqttProtocol) start(id int, pre string, br string, dir string) {
-	log.Printf("Device: %s-%v", pre, id)
-	file := createMqttFileConfig(id, pre, dir, *m)
-	m.startMqttAgent(file, pre, br, strconv.Itoa(id))
+func (m *MqttProtocol) startAgentBareMetal(id, pre, br, dir string) {
+	configFile := createMqttFileConfig(id, pre, dir, *m)
+	dbFile := dir + "/db-" + pre + "-" + id + ".db"
+
+	args := []string{
+		"-p",
+		"-v", "4",
+		"-r", configFile,
+		"-f", dbFile,
+		"-i", m.BareMetal.EthernetInterface,
+	}
+
+	if m.Ssl {
+		sslFile := dir + "/chain.pem"
+		args = append(args, "-t")
+		args = append(args, sslFile)
+	}
+
+	cmd := exec.CommandContext(m.Ctx, m.BareMetal.ExecutablePath, args...)
+
+	if m.BareMetal.LogToStdout {
+		cmd.Stdout = os.Stdout
+	}
+
+	err := cmd.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		log.Println(err)
+	}
+
+	if m.BareMetal.CleanDb {
+		err = os.Remove(dbFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 }
 
-func createMqttFileConfig(id int, pre, dir string, m MqttProtocol) string {
+func (m *MqttProtocol) startAgentDocker(id string, pre string, br string, dir string) {
+
+	file := createMqttFileConfig(id, pre, dir, *m)
+
+	id, err := container.RunDockerContainer(
+		m.Ctx,
+		m.Cli,
+		utils.DOCKER_IMG_NAME,
+		br,
+		pre+"-"+id+"-"+"mqtt",
+		file,
+		"",
+	)
+
+	if err != nil {
+		log.Println(err)
+	}
+
+	<-m.Ctx.Done()
+
+	err = container.DeleteDockerContainer(context.TODO(), m.Cli, id)
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Printf("Deleted docker mqtt container: %s", id)
+	}
+
+	m.Wg.Done()
+}
+
+func createMqttFileConfig(id string, pre, dir string, m MqttProtocol) string {
 	//TODO: create ssl agent option
 	//TODO: create mqqt client version
 	err := os.WriteFile(
-		dir+"/"+pre+"-"+strconv.Itoa(id)+"-mqtt.txt",
+		dir+"/"+pre+"-"+id+"-mqtt.txt",
 		[]byte(`
 #
 # This file contains a factory reset database in text format
@@ -73,7 +141,7 @@ func createMqttFileConfig(id int, pre, dir string, m MqttProtocol) string {
 # Adding MQTT parameters to test the datamodel interface
 #
 
-Device.LocalAgent.EndpointID "`+pre+"-"+strconv.Itoa(id)+`-mqtt"
+Device.LocalAgent.EndpointID "`+pre+"-"+id+`-mqtt"
 
 
 ## Adding boot params
@@ -110,7 +178,7 @@ Device.LocalAgent.Controller.1.Enable true
 Device.LocalAgent.Controller.1.PeriodicNotifInterval "86400"
 Device.LocalAgent.Controller.1.PeriodicNotifTime "0001-01-01T00:00:00Z"
 Device.LocalAgent.Controller.1.ControllerCode ""
-Device.LocalAgent.Controller.1.MTP.1.Alias "`+pre+strconv.Itoa(id)+`"
+Device.LocalAgent.Controller.1.MTP.1.Alias "`+pre+id+`"
 Device.LocalAgent.Controller.1.MTP.1.Enable true
 Device.LocalAgent.Controller.1.MTP.1.Protocol "MQTT"
 Device.LocalAgent.Controller.1.EndpointID "oktopusController"
@@ -122,10 +190,10 @@ Device.LocalAgent.Controller.1.MTP.1.MQTT.Topic "oktopus/v1/controller"
 #
 # The following parameters may be modified
 #
-Device.LocalAgent.MTP.1.Alias "`+pre+strconv.Itoa(id)+`"
+Device.LocalAgent.MTP.1.Alias "`+pre+id+`"
 Device.LocalAgent.MTP.1.Enable true
 Device.LocalAgent.MTP.1.Protocol "MQTT"
-Device.DeviceInfo.SerialNumber "`+pre+"-"+strconv.Itoa(id)+`"
+Device.DeviceInfo.SerialNumber "`+pre+"-"+id+`"
 
 Internal.Reboot.Cause "LocalFactoryReset"
 		`),
@@ -135,32 +203,5 @@ Internal.Reboot.Cause "LocalFactoryReset"
 		log.Fatal("Error to create config file: ", err)
 	}
 
-	return dir + "/" + pre + "-" + strconv.Itoa(id) + "-mqtt.txt"
-}
-
-func (m *MqttProtocol) startMqttAgent(file, pre, br, id string) {
-	id, err := container.RunDockerContainer(
-		m.Ctx,
-		m.Cli,
-		utils.DOCKER_IMG_NAME,
-		br,
-		pre+"-"+id+"-"+"mqtt",
-		file,
-		"",
-	)
-
-	if err != nil {
-		log.Println(err)
-	}
-
-	<-m.Ctx.Done()
-
-	err = container.DeleteDockerContainer(context.TODO(), m.Cli, id)
-	if err != nil {
-		log.Println(err)
-	} else {
-		log.Printf("Deleted docker mqtt container: %s", id)
-	}
-
-	m.Wg.Done()
+	return dir + "/" + pre + "-" + id + "-mqtt.txt"
 }
