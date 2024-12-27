@@ -85,6 +85,8 @@ func (m *MqttProtocol) startAgentBareMetal(id, pre, br, dir string) {
 			log.Fatal(err)
 		}
 	}
+
+	m.Wg.Done()
 }
 
 func (m *MqttProtocol) startAgentDocker(id string, pre string, br string, dir string) {

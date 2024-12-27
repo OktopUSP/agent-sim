@@ -85,6 +85,8 @@ func (s *StompProtocol) startAgentBareMetal(id string, pre, br, dir string) {
 			log.Fatal(err)
 		}
 	}
+
+	s.Wg.Done()
 }
 
 func (s *StompProtocol) startAgentDocker(id string, pre, br, dir string) {
