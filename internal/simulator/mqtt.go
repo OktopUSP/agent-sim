@@ -95,14 +95,23 @@ func (m *MqttProtocol) startAgentDocker(id string, pre string, br string, dir st
 
 	file := createMqttFileConfig(id, pre, dir, *m)
 
+	sslFile := ""
+	if m.Ssl {
+		if m.Ssl {
+			sslFile = dir + "/chain.pem"
+		}
+		log.Println("SSL enabled")
+		log.Println("SSL file path:", sslFile)
+	}
+
 	id, err := container.RunDockerContainer(
 		m.Ctx,
 		m.Cli,
 		utils.DOCKER_IMG_NAME,
 		br,
-		pre+"-"+id+"-"+"mqtt",
+		pre+"-"+id+"-"+"stomp",
 		file,
-		"",
+		sslFile,
 	)
 
 	if err != nil {
