@@ -149,20 +149,13 @@ Device.LocalAgent.EndpointID "`+pre+"-"+id+`-mqtt"
 ## Adding boot params
 Device.LocalAgent.Controller.1.BootParameter.1.Enable true
 Device.LocalAgent.Controller.1.BootParameter.1.ParameterName "Device.LocalAgent.EndpointID"
-Device.LocalAgent.Subscription.1.Alias cpe-1
-Device.LocalAgent.Subscription.1.Enable true
-Device.LocalAgent.Subscription.1.ID default-boot-event-ACS
-Device.LocalAgent.Subscription.1.Recipient Device.LocalAgent.Controller.1
-Device.LocalAgent.Subscription.1.NotifType Event
-Device.LocalAgent.Subscription.1.ReferenceList Device.Boot!
-Device.LocalAgent.Subscription.1.Persistent true
 
-Device.LocalAgent.MTP.1.MQTT.ResponseTopicConfigured "oktopus/v1/controller"
 Device.LocalAgent.MTP.1.MQTT.Reference "Device.MQTT.Client.1"
+Device.MQTT.Client.1.RequestResponseInfo true
 Device.MQTT.Client.1.BrokerAddress "`+m.Addr+`"
 Device.MQTT.Client.1.ProtocolVersion "5.0"
 Device.MQTT.Client.1.BrokerPort "`+m.Port+`"
-Device.MQTT.Client.1.TransportProtocol "TCP/IP"
+Device.MQTT.Client.1.TransportProtocol "`+isTLS(m.Ssl)+`"
 Device.MQTT.Client.1.Username "`+m.User+`"
 Device.MQTT.Client.1.Password "`+m.Pass+`"
 Device.MQTT.Client.1.Alias "cpe-1"
@@ -183,10 +176,8 @@ Device.LocalAgent.Controller.1.ControllerCode ""
 Device.LocalAgent.Controller.1.MTP.1.Alias "`+pre+id+`"
 Device.LocalAgent.Controller.1.MTP.1.Enable true
 Device.LocalAgent.Controller.1.MTP.1.Protocol "MQTT"
-Device.LocalAgent.Controller.1.EndpointID "oktopusController"
+Device.LocalAgent.Controller.1.EndpointID "proto::oktopus"
 Device.LocalAgent.Controller.1.MTP.1.MQTT.Reference "Device.MQTT.Client.1"
-Device.LocalAgent.Controller.1.MTP.1.MQTT.Topic "oktopus/v1/controller"
-
 
 
 #
@@ -206,4 +197,11 @@ Internal.Reboot.Cause "LocalFactoryReset"
 	}
 
 	return dir + "/" + pre + "-" + id + "-mqtt.txt"
+}
+
+func isTLS(isTLS bool) string {
+	if isTLS {
+		return "TLS"
+	}
+	return "TCP/IP"
 }
