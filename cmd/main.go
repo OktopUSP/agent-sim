@@ -55,6 +55,7 @@ func main() {
 	flNumToStartIds := flag.Int("num_to_start_ids", utils.LookupEnvOrInt("NUM_TO_START_IDS", 0), "From where to start your IDs")
 	flMtp := flag.String("protocol", utils.LookupEnvOrString("MTP", ""), "MTP to use (mqtt, stomp, websockets)")
 	flMqttAddr := flag.String("mqtt_addr", utils.LookupEnvOrString("MQTT_ADDR", "localhost"), "Address of the mqtt broker")
+	flMqttAddr2 := flag.String("mqtt_addr2", utils.LookupEnvOrString("MQTT_ADDR2", "localhost"), "Address of the mqtt broker")
 	flMqttPort := flag.String("mqtt_port", utils.LookupEnvOrString("MQTT_PORT", "1883"), "Port of the mqtt broker")
 	flMqttUser := flag.String("mqtt_user", utils.LookupEnvOrString("MQTT_USER", ""), "Mqtt user")
 	flMqttPasswd := flag.String("mqtt_passwd", utils.LookupEnvOrString("MQTT_PASSWD", ""), "Mqtt password")
@@ -65,6 +66,7 @@ func main() {
 	flBridgeName := flag.String("br_name", utils.LookupEnvOrString("BR_NAME", "bridge"), "Bridge name of docker network")
 	flWsSsl := flag.Bool("ws_ssl", utils.LookupEnvOrBool("WS_SSL", false), "Websockets with tls/ssl")
 	flStompAddr := flag.String("stomp_addr", utils.LookupEnvOrString("STOMP_ADDR", "localhost"), "Address of the stomp broker")
+	flStompAddr2 := flag.String("stomp_addr2", utils.LookupEnvOrString("STOMP_ADDR2", "localhost"), "Address of the stomp broker")
 	flStompPort := flag.String("stomp_port", utils.LookupEnvOrString("STOMP_PORT", "61613"), "Port of the stomp broker")
 	flStompUser := flag.String("stomp_user", utils.LookupEnvOrString("STOMP_USER", ""), "Stomp user")
 	flStompPasswd := flag.String("stomp_passwd", utils.LookupEnvOrString("STOMP_PASSWD", ""), "Stomp password")
@@ -74,7 +76,7 @@ func main() {
 	flExecutablePath := flag.String("executable_path", utils.LookupEnvOrString("EXECUTABLE_PATH", "/usr/local/bin/obuspa"), "Path to obuspa executable")
 	flCleanDb := flag.Bool("clean_db", utils.LookupEnvOrBool("CLEAN_DB", false), "Clean obuspa database at the end of execution")
 	flLogToStdout := flag.Bool("log_to_stdout", utils.LookupEnvOrBool("LOG_TO_STDOUT", false), "Log to stdout")
-	flPath := flag.String("path", utils.LookupEnvOrString("PATH", ""), "Folder path to save configurations")
+	flPath := flag.String("path_cfg", utils.LookupEnvOrString("PATH_CFG", ""), "Folder path to save configurations")
 	flImgPath := flag.String("imgpath", utils.LookupEnvOrString("DOCKERFILE_PATH", ""), "Path to Dockerfile")
 	flPrefix := flag.String("prefix", utils.LookupEnvOrString("PREFIX", "oktopus"), "Prefix of device id")
 	flHelp := flag.Bool("help", false, "Help")
@@ -120,6 +122,7 @@ func main() {
 		*flMqttPasswd,
 		*flMqttSsl,
 		*flMqttAddr,
+		*flMqttAddr2,
 		*flMqttPort,
 		/* -------------------------------------------------------------------------- */
 
@@ -132,6 +135,7 @@ func main() {
 
 		/* ------------------------------ Stomp Configs ----------------------------- */
 		*flStompAddr,
+		*flStompAddr2,
 		*flStompPort,
 		*flStompUser,
 		*flStompPasswd,

@@ -37,11 +37,12 @@ type Docker struct {
 }
 
 type Mqtt struct {
-	Addr string
-	Port string
-	User string
-	Pass string
-	Ssl  bool
+	Addr  string
+	Addr2 string
+	Port  string
+	User  string
+	Pass  string
+	Ssl   bool
 }
 
 type WebSockets struct {
@@ -53,6 +54,7 @@ type WebSockets struct {
 
 type Stomp struct {
 	Addr   string
+	Addr2  string
 	Port   string
 	User   string
 	Passwd string
@@ -73,12 +75,14 @@ func NewConfig(
 	mqttPass string,
 	mqttSsl bool,
 	mqttAddr string,
+	mqttAddr2 string,
 	mqttPort string,
 	wsAddr string,
 	wsPort string,
 	flWsRoute string,
 	wsSsl bool,
 	stompAddr string,
+	stompAddr2 string,
 	stompPort string,
 	stompUser string,
 	stompPasswd string,
@@ -103,11 +107,12 @@ func NewConfig(
 		},
 		BrName: flBridgeName,
 		Mqtt: Mqtt{
-			Addr: mqttAddr,
-			Port: mqttPort,
-			User: mqttUser,
-			Pass: mqttPass,
-			Ssl:  mqttSsl,
+			Addr:  mqttAddr,
+			Addr2: mqttAddr2,
+			Port:  mqttPort,
+			User:  mqttUser,
+			Pass:  mqttPass,
+			Ssl:   mqttSsl,
 		},
 		WebSockets: WebSockets{
 			Addr:  wsAddr,
@@ -117,6 +122,7 @@ func NewConfig(
 		},
 		Stomp: Stomp{
 			Addr:   stompAddr,
+			Addr2:  stompAddr2,
 			Port:   stompPort,
 			User:   stompUser,
 			Passwd: stompPasswd,

@@ -16,6 +16,7 @@ import (
 
 type StompProtocol struct {
 	Addr      string
+	Addr2     string
 	Port      string
 	User      string
 	Passwd    string
@@ -33,6 +34,7 @@ func newStomp(c config.Config) StompProtocol {
 	return StompProtocol{
 		/* ----------------------- Stomp connection parameters ----------------------- */
 		Addr:   c.Stomp.Addr,
+		Addr2:  c.Stomp.Addr2,
 		Port:   c.Stomp.Port,
 		User:   c.Stomp.User,
 		Passwd: c.Stomp.Passwd,
@@ -101,30 +103,7 @@ func (s *StompProtocol) startAgentDocker(id string, pre, br, dir string) {
 		log.Println("SSL file path:", sslFile)
 	}
 
-	id, err := container.RunDockerContainer(
-		s.Ctx,
-		s.Cli,
-		utils.DOCKER_IMG_NAME,
-		br,
-		pre+"-"+id+"-"+"stomp",
-		file,
-		sslFile,
-	)
-
-	if err != nil {
-		log.Println(err)
-	}
-
-	<-s.Ctx.Done()
-
-	err = container.DeleteDockerContainer(context.TODO(), s.Cli, id)
-	if err != nil {
-		log.Println(err)
-	} else {
-		log.Printf("Deleted docker stomp container: %s", id)
-	}
-
-	s.Wg.Done()
+	s.startStompAgent(file, pre, br, id, sslFile)
 }
 
 func createStompFileConfig(id string, pre, dir string, s StompProtocol) string {
@@ -156,6 +135,9 @@ Device.LocalAgent.Controller.1.EndpointID "oktopusController"
 Device.STOMP.Connection.1.Host "`+s.Addr+`"
 Device.STOMP.Connection.1.Username "`+s.User+`"
 Device.STOMP.Connection.1.Password "`+s.Passwd+`"
+Device.STOMP.Connection.2.Host "`+s.Addr2+`"
+Device.STOMP.Connection.2.Username "`+s.User+`"
+Device.STOMP.Connection.2.Password "`+s.Passwd+`"
 
 #
 # The following parameters may be modified
@@ -165,6 +147,11 @@ Device.LocalAgent.MTP.1.Enable "true"
 Device.LocalAgent.MTP.1.Protocol "STOMP"
 Device.LocalAgent.MTP.1.STOMP.Reference "Device.STOMP.Connection.1"
 Device.LocalAgent.MTP.1.STOMP.Destination "oktopus/usp/v1/agent"
+Device.LocalAgent.MTP.2.Alias "`+pre+id+`2"
+Device.LocalAgent.MTP.2.Enable "true"
+Device.LocalAgent.MTP.2.Protocol "STOMP"
+Device.LocalAgent.MTP.2.STOMP.Reference "Device.STOMP.Connection.2"
+Device.LocalAgent.MTP.2.STOMP.Destination "oktopus/usp/v1/agent"
 Device.LocalAgent.Controller.1.Alias "cpe-1"
 Device.LocalAgent.Controller.1.Enable "true"
 Device.LocalAgent.Controller.1.AssignedRole "Device.LocalAgent.ControllerTrust.Role.1"
@@ -178,6 +165,11 @@ Device.LocalAgent.Controller.1.MTP.1.Enable "true"
 Device.LocalAgent.Controller.1.MTP.1.Protocol "STOMP"
 Device.LocalAgent.Controller.1.MTP.1.STOMP.Reference "Device.STOMP.Connection.1"
 Device.LocalAgent.Controller.1.MTP.1.STOMP.Destination "controller-notify-dest"
+Device.LocalAgent.Controller.1.MTP.2.Alias "`+pre+id+`2"
+Device.LocalAgent.Controller.1.MTP.2.Enable "true"
+Device.LocalAgent.Controller.1.MTP.2.Protocol "STOMP"
+Device.LocalAgent.Controller.1.MTP.2.STOMP.Reference "Device.STOMP.Connection.2"
+Device.LocalAgent.Controller.1.MTP.2.STOMP.Destination "controller-notify-dest"
 Device.STOMP.Connection.1.Alias "cpe-1"
 Device.STOMP.Connection.1.Enable "true"
 Device.STOMP.Connection.1.Port "`+s.Port+`"
@@ -189,8 +181,20 @@ Device.STOMP.Connection.1.IncomingHeartbeat "300000"
 Device.STOMP.Connection.1.ServerRetryInitialInterval "60"
 Device.STOMP.Connection.1.ServerRetryIntervalMultiplier "2000"
 Device.STOMP.Connection.1.ServerRetryMaxInterval "30720"
+Device.STOMP.Connection.2.Alias "cpe-2"
+Device.STOMP.Connection.2.Enable "true"
+Device.STOMP.Connection.2.Port "`+s.Port+`"
+Device.STOMP.Connection.2.EnableEncryption "false"
+Device.STOMP.Connection.2.VirtualHost "/"
+Device.STOMP.Connection.2.EnableHeartbeats "true"
+Device.STOMP.Connection.2.OutgoingHeartbeat "30000"
+Device.STOMP.Connection.2.IncomingHeartbeat "300000"
+Device.STOMP.Connection.2.ServerRetryInitialInterval "60"
+Device.STOMP.Connection.2.ServerRetryIntervalMultiplier "2000"
+Device.STOMP.Connection.2.ServerRetryMaxInterval "30720"
 Device.DeviceInfo.SerialNumber "`+pre+"-"+id+`"
 Device.STOMP.Connection.1.EnableEncryption "`+strconv.FormatBool(s.Ssl)+`"
+Device.STOMP.Connection.2.EnableEncryption "`+strconv.FormatBool(s.Ssl)+`"
 Internal.Reboot.Cause "LocalFactoryReset"
 		`),
 		0644,
@@ -200,4 +204,32 @@ Internal.Reboot.Cause "LocalFactoryReset"
 	}
 
 	return dir + "/" + pre + "-" + id + "-stomp.txt"
+}
+
+func (s *StompProtocol) startStompAgent(file, pre, br, id, sslFile string) {
+
+	id, err := container.RunDockerContainer(
+		s.Ctx,
+		s.Cli,
+		utils.DOCKER_IMG_NAME,
+		br,
+		pre+"-"+id+"-"+"stomp",
+		file,
+		sslFile,
+	)
+
+	if err != nil {
+		log.Println(err)
+	}
+
+	<-s.Ctx.Done()
+
+	err = container.DeleteDockerContainer(context.TODO(), s.Cli, id)
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Printf("Deleted docker stomp container: %s", id)
+	}
+
+	s.Wg.Done()
 }

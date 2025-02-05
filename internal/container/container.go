@@ -98,18 +98,36 @@ func RunDockerContainer(
 	tlsBind string,
 ) (string, error) {
 
-	hostConfig := container.HostConfig{
-		NetworkMode: "bridge",
-		Mounts: []mount.Mount{
-			{
-				Type:   mount.TypeBind,
-				Source: confBind,
-				Target: "/etc/factory_reset_example.txt",
+	var hostConfig container.HostConfig
+
+	if bridgeName == "" {
+		hostConfig = container.HostConfig{
+			Mounts: []mount.Mount{
+				{
+					Type:   mount.TypeBind,
+					Source: confBind,
+					Target: "/etc/factory_reset_example.txt",
+				},
 			},
-		},
-		ExtraHosts: []string{
-			"host.docker.internal:host-gateway",
-		},
+			ExtraHosts: []string{
+				"host.docker.internal:host-gateway",
+			},
+		}
+
+	} else {
+		hostConfig = container.HostConfig{
+			NetworkMode: "bridge",
+			Mounts: []mount.Mount{
+				{
+					Type:   mount.TypeBind,
+					Source: confBind,
+					Target: "/etc/factory_reset_example.txt",
+				},
+			},
+			ExtraHosts: []string{
+				"host.docker.internal:host-gateway",
+			},
+		}
 	}
 
 	containerConfig := container.Config{
@@ -129,9 +147,11 @@ func RunDockerContainer(
 	}
 
 	var networking_config *network.NetworkingConfig
-	networking_config = &network.NetworkingConfig{
-		EndpointsConfig: map[string]*network.EndpointSettings{
-			bridgeName: {}},
+	if bridgeName != "" {
+		networking_config = &network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{
+				bridgeName: {}},
+		}
 	}
 
 	resp, err := cli.ContainerCreate(

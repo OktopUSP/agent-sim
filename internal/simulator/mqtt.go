@@ -15,6 +15,7 @@ import (
 
 type MqttProtocol struct {
 	Addr      string
+	Addr2     string
 	Port      string
 	User      string
 	Pass      string
@@ -32,11 +33,12 @@ func newMqtt(c config.Config) MqttProtocol {
 
 	return MqttProtocol{
 		/* ----------------------- Mqtt connection parameters ----------------------- */
-		Addr: c.Mqtt.Addr,
-		Port: c.Mqtt.Port,
-		User: c.Mqtt.User,
-		Pass: c.Mqtt.Pass,
-		Ssl:  c.Mqtt.Ssl,
+		Addr:  c.Mqtt.Addr,
+		Addr2: c.Mqtt.Addr2,
+		Port:  c.Mqtt.Port,
+		User:  c.Mqtt.User,
+		Pass:  c.Mqtt.Pass,
+		Ssl:   c.Mqtt.Ssl,
 		/* -------------------------------------------------------------------------- */
 		Ctx:       c.Ctx,
 		Wg:        c.Wg,
@@ -151,6 +153,8 @@ Device.LocalAgent.Controller.1.BootParameter.1.Enable true
 Device.LocalAgent.Controller.1.BootParameter.1.ParameterName "Device.LocalAgent.EndpointID"
 
 Device.LocalAgent.MTP.1.MQTT.Reference "Device.MQTT.Client.1"
+Device.LocalAgent.MTP.2.MQTT.ResponseTopicConfigured "oktopus/v1/controller"
+Device.LocalAgent.MTP.2.MQTT.Reference "Device.MQTT.Client.2"
 Device.MQTT.Client.1.RequestResponseInfo true
 Device.MQTT.Client.1.BrokerAddress "`+m.Addr+`"
 Device.MQTT.Client.1.ProtocolVersion "5.0"
@@ -163,9 +167,24 @@ Device.MQTT.Client.1.Enable true
 Device.MQTT.Client.1.ClientID ""
 Device.MQTT.Client.1.KeepAliveTime "60"
 
+Device.MQTT.Client.2.BrokerAddress "`+m.Addr2+`"
+Device.MQTT.Client.2.ProtocolVersion "5.0"
+Device.MQTT.Client.2.BrokerPort "`+m.Port+`"
+Device.MQTT.Client.2.TransportProtocol "TCP/IP"
+Device.MQTT.Client.2.Username "`+m.User+`"
+Device.MQTT.Client.2.Password "`+m.Pass+`"
+Device.MQTT.Client.2.Alias "cpe-1"
+Device.MQTT.Client.2.Enable true
+Device.MQTT.Client.2.ClientID ""
+Device.MQTT.Client.2.KeepAliveTime "60"
+
 Device.MQTT.Client.1.ConnectRetryTime "5"
 Device.MQTT.Client.1.ConnectRetryIntervalMultiplier   "2000"
 Device.MQTT.Client.1.ConnectRetryMaxInterval "60"
+
+Device.MQTT.Client.2.ConnectRetryTime "5"
+Device.MQTT.Client.2.ConnectRetryIntervalMultiplier   "2000"
+Device.MQTT.Client.2.ConnectRetryMaxInterval "60"
 
 
 Device.LocalAgent.Controller.1.Alias "cpe-1"
@@ -178,6 +197,9 @@ Device.LocalAgent.Controller.1.MTP.1.Enable true
 Device.LocalAgent.Controller.1.MTP.1.Protocol "MQTT"
 Device.LocalAgent.Controller.1.EndpointID "proto::oktopus"
 Device.LocalAgent.Controller.1.MTP.1.MQTT.Reference "Device.MQTT.Client.1"
+Device.LocalAgent.Controller.1.MTP.1.MQTT.Topic "oktopus/v1/controller"
+Device.LocalAgent.Controller.1.MTP.2.MQTT.Reference "Device.MQTT.Client.2"
+Device.LocalAgent.Controller.1.MTP.2.MQTT.Topic "oktopus/v1/controller"
 
 
 #
@@ -186,6 +208,9 @@ Device.LocalAgent.Controller.1.MTP.1.MQTT.Reference "Device.MQTT.Client.1"
 Device.LocalAgent.MTP.1.Alias "`+pre+id+`"
 Device.LocalAgent.MTP.1.Enable true
 Device.LocalAgent.MTP.1.Protocol "MQTT"
+Device.LocalAgent.MTP.2.Alias "`+pre+id+`"
+Device.LocalAgent.MTP.2.Enable true
+Device.LocalAgent.MTP.2.Protocol "MQTT"
 Device.DeviceInfo.SerialNumber "`+pre+"-"+id+`"
 
 Internal.Reboot.Cause "LocalFactoryReset"
@@ -204,4 +229,31 @@ func isTLS(isTLS bool) string {
 		return "TLS"
 	}
 	return "TCP/IP"
+}
+
+func (m *MqttProtocol) startMqttAgent(file, pre, br, id string) {
+	id, err := container.RunDockerContainer(
+		m.Ctx,
+		m.Cli,
+		utils.DOCKER_IMG_NAME,
+		br,
+		pre+"-"+id+"-"+"mqtt",
+		file,
+		"",
+	)
+
+	if err != nil {
+		log.Println(err)
+	}
+
+	<-m.Ctx.Done()
+
+	err = container.DeleteDockerContainer(context.TODO(), m.Cli, id)
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Printf("Deleted docker mqtt container: %s", id)
+	}
+
+	m.Wg.Done()
 }
