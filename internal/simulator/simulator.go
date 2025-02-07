@@ -33,8 +33,16 @@ func StartDeviceSimulator(c config.Config) {
 
 	stopCounting := c.SimNumber + c.NumToStartId
 
-	if c.BareMetal.Enable {
+	if c.BrName == "" {
+		log.Println("Bridge name not defined")
+		c.BrName = "br"
+	}
 
+	j := 0
+	br := 0
+
+	if c.BareMetal.Enable {
+		log.Println("Starting bare metal agent(s)")
 		for i := c.NumToStartId; i < stopCounting; i++ {
 			c.Wg.Add(1)
 			go agent_sim.startAgentBareMetal(strconv.Itoa(i), c.Prefix, c.BrName, fileConfigDir)
@@ -50,6 +58,12 @@ func StartDeviceSimulator(c config.Config) {
 
 		for i := c.NumToStartId; i < stopCounting; i++ {
 			c.Wg.Add(1)
+			j++
+			if j > 1000 {
+				br++
+				c.BrName = c.BrName + strconv.Itoa(br)
+				j = 0
+			}
 			go agent_sim.startAgentDocker(strconv.Itoa(i), c.Prefix, c.BrName, fileConfigDir)
 			// time.Sleep(time.Duration(100) * time.Millisecond)
 		}

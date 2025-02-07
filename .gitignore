@@ -26,5 +26,9 @@ go.work
 
 # Generated obuspa db
 *.db
+*.db-journal
 
 *.pem
+
+# binary generated file
+agent-sim

@@ -49,12 +49,18 @@ func (m *MqttProtocol) startAgentBareMetal(id, pre, br, dir string) {
 	configFile := createMqttFileConfig(id, pre, dir, *m)
 	dbFile := dir + "/db-" + pre + "-" + id + ".db"
 
+	tempDir, err := os.MkdirTemp("/tmp", "agent-"+id)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	args := []string{
 		"-p",
 		"-v", "4",
 		"-r", configFile,
 		"-f", dbFile,
 		"-i", m.BareMetal.EthernetInterface,
+		"-s", tempDir,
 	}
 
 	if m.Ssl {
@@ -69,7 +75,7 @@ func (m *MqttProtocol) startAgentBareMetal(id, pre, br, dir string) {
 		cmd.Stdout = os.Stdout
 	}
 
-	err := cmd.Start()
+	err = cmd.Start()
 	if err != nil {
 		log.Fatal(err)
 	}
