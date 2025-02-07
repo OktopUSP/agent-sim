@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/OktopUSP/agent-sim/internal/config"
@@ -18,7 +19,6 @@ import (
 )
 
 const FILENAME = "oktopus-agent-sim"
-const VERSION = "0.1.1"
 
 func main() {
 	done := make(chan os.Signal, 1)
@@ -28,19 +28,23 @@ func main() {
 	localEnv := ".env.local"
 	if _, err := os.Stat(localEnv); err == nil {
 		_ = godotenv.Overload(localEnv)
-		log.Println("Loaded variables from '.env.local'")
+		slog.Info("Loaded variables from '.env.local'")
 	} else {
-		log.Println("Loaded variables from '.env'")
+		slog.Info("Loaded variables from '.env'")
 	}
 
 	if err != nil {
-		log.Println("Error to load environment variables:", err)
+		slog.Warn("Error to load environment variables:", "error", err)
 	}
+
+	slog.SetDefault(
+		slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: getLogLevelFromEnv(),
+		})),
+	)
 
 	// Locks app running until it receives a stop command as Ctrl+C.
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
-
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	/*
 		App variables priority:
@@ -49,7 +53,7 @@ func main() {
 		3º - Default flag value.
 	*/
 
-	log.Println("Starting Oktopus TR-369 Agent Simulator Version:", VERSION)
+	slog.Info("Starting Oktopus TR-369 Agent Simulator")
 
 	flSimNum := flag.Int("sim_number", utils.LookupEnvOrInt("SIM_NUM", 1), "Number of simulated devices")
 	flNumToStartIds := flag.Int("num_to_start_ids", utils.LookupEnvOrInt("NUM_TO_START_IDS", 0), "From where to start your IDs")
@@ -93,12 +97,14 @@ func main() {
 	if !*flBareMetal {
 		cli, err = container.CreateDockerClient()
 		if err != nil {
-			log.Fatal(err)
+			slog.Error("Error to create docker client:", "error", err)
+			os.Exit(1)
 		}
 	} else {
 		err = exec.Command("/usr/local/bin/obuspa", "-h").Run()
 		if err != nil {
-			log.Fatal(err)
+			slog.Error("Error to execute OBUSPA:", "error", err)
+			os.Exit(1)
 		}
 	}
 
@@ -149,11 +155,11 @@ func main() {
 	go simulator.StartDeviceSimulator(conf)
 
 	<-done
-	log.Println("Received signal to stop the simulator")
+	slog.Info("Received signal to stop the simulator")
 
 	/* ----------------------------- Stop Gracefully ---------------------------- */
 	cancel()
-	log.Println("Waiting for all agents to stop")
+	slog.Info("Waiting for all agents to stop")
 	conf.Wg.Wait()
 
 	if !*flBareMetal {
@@ -161,5 +167,22 @@ func main() {
 	}
 	/* -------------------------------------------------------------------------- */
 
-	log.Println("(⌐■_■) Agent simulator is out!")
+	slog.Info("(⌐■_■) Agent simulator is out!")
+}
+
+func getLogLevelFromEnv() slog.Level {
+	levelStr := strings.ToLower(os.Getenv("LOG_LEVEL")) // Read and normalize
+
+	switch levelStr {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo // Default level
+	}
 }

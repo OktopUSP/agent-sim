@@ -6,7 +6,7 @@ import (
 	"context"
 	"io"
 	"io/ioutil"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/docker/docker/api/types"
@@ -29,11 +29,13 @@ func BuildDockerImage(ctx context.Context, cli *client.Client, imageName string,
 	/* ------------------------- Open + Read Dokcerfile ------------------------- */
 	dockerFileReader, err := os.Open(dockerfilePath)
 	if err != nil {
-		log.Fatal(err, " :unable to open Dockerfile")
+		slog.Error("Error to open dockerfile", "error", err)
+		os.Exit(1)
 	}
 	readDockerFile, err := ioutil.ReadAll(dockerFileReader)
 	if err != nil {
-		log.Fatal(err, " :unable to read dockerfile")
+		slog.Error("Error to read dockerfile", "error", err)
+		os.Exit(1)
 	}
 	/* -------------------------------------------------------------------------- */
 
@@ -48,11 +50,13 @@ func BuildDockerImage(ctx context.Context, cli *client.Client, imageName string,
 	}
 	err = tw.WriteHeader(tarHeader)
 	if err != nil {
-		log.Fatal(err, " :unable to write tar header")
+		slog.Error("Error to write tar header", "error", err)
+		os.Exit(1)
 	}
 	_, err = tw.Write(readDockerFile)
 	if err != nil {
-		log.Fatal(err, " :unable to write tar body")
+		slog.Error("Error to write tar body", "error", err)
+		os.Exit(1)
 	}
 	dockerFileTarReader := bytes.NewReader(buf.Bytes())
 	/* -------------------------------------------------------------------------- */
@@ -128,8 +132,7 @@ func RunDockerContainer(
 		})
 	}
 
-	var networking_config *network.NetworkingConfig
-	networking_config = &network.NetworkingConfig{
+	networking_config := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
 			bridgeName: {}},
 	}
@@ -150,18 +153,18 @@ func RunDockerContainer(
 		return "", err
 	}
 
-	log.Printf("Container %s started\n", containerName)
+	slog.Debug("Container created and started", "container", containerName)
 	return resp.ID, nil
 }
 
 func DeleteDockerContainer(ctx context.Context, cli *client.Client, containerName string) error {
-	log.Printf("Stopping docker container: %s ...", containerName)
+	slog.Debug("Stopping docker container ...", "container", containerName)
 	err := stopDockerContainer(ctx, cli, containerName)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("Removing docker container: %s ...", containerName)
+	slog.Debug("Removing docker container ...", "container", containerName)
 	err = removeDockerContainer(ctx, cli, containerName)
 	if err != nil {
 		return err

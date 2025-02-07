@@ -2,6 +2,7 @@ package simulator
 
 import (
 	"log"
+	"log/slog"
 	"os"
 	"strconv"
 
@@ -42,12 +43,13 @@ func StartDeviceSimulator(c config.Config) {
 	br := 0
 
 	if c.BareMetal.Enable {
-		log.Println("Starting bare metal agent(s)")
+		slog.Info("Starting bare metal agent(s)", "number", c.SimNumber)
 		for i := c.NumToStartId; i < stopCounting; i++ {
 			c.Wg.Add(1)
 			go agent_sim.startAgentBareMetal(strconv.Itoa(i), c.Prefix, c.BrName, fileConfigDir)
 			// time.Sleep(time.Duration(100) * time.Millisecond)
 		}
+		slog.Info("Bare metal agent(s) started")
 
 	} else {
 

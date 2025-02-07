@@ -3,6 +3,7 @@ package simulator
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"sync"
@@ -27,8 +28,18 @@ type MqttProtocol struct {
 
 func newMqtt(c config.Config) MqttProtocol {
 
-	log.Println("Create new agent(s) with mqtt protocol")
-	log.Printf("Mqtt client config: %++v", c.Mqtt)
+	slog.Info(
+		"Create new agent(s) with mqtt protocol",
+		slog.Group(
+			"MQTT configuration",
+			"address", c.Mqtt.Addr,
+			"port", c.Mqtt.Port,
+			"user", c.Mqtt.User,
+			"password", c.Mqtt.Pass,
+			"ssl", c.Mqtt.Ssl,
+			"bare_metal", c.BareMetal.Enable,
+		),
+	)
 
 	return MqttProtocol{
 		/* ----------------------- Mqtt connection parameters ----------------------- */
@@ -46,12 +57,13 @@ func newMqtt(c config.Config) MqttProtocol {
 }
 
 func (m *MqttProtocol) startAgentBareMetal(id, pre, br, dir string) {
+
 	configFile := createMqttFileConfig(id, pre, dir, *m)
 	dbFile := dir + "/db-" + pre + "-" + id + ".db"
 
 	tempDir, err := os.MkdirTemp("/tmp", "agent-"+id)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Error to create temp dir", "error", err, "id", id)
 	}
 
 	args := []string{
@@ -77,12 +89,16 @@ func (m *MqttProtocol) startAgentBareMetal(id, pre, br, dir string) {
 
 	err = cmd.Start()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Error to start OBUSPA:", "error", err, "id", id)
 	}
+	slog.Debug("agent started", "id", id)
 
 	err = cmd.Wait()
 	if err != nil {
-		log.Println(err)
+		if err.Error() != "signal: interrupt" {
+			slog.Error("Error during OBUSPA execution:", "error", err, "id", id)
+		}
+		slog.Debug("agent stopped", "id", id)
 	}
 
 	if m.BareMetal.CleanDb {
