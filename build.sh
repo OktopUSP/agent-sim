@@ -1,1 +1,1 @@
-go run -o simulator cmd/main.go
+go build -o simulator cmd/main.go
