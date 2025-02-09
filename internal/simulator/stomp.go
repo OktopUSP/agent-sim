@@ -2,6 +2,7 @@ package simulator
 
 import (
 	"context"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -45,7 +46,7 @@ func newStomp(c config.Config) StompProtocol {
 	}
 }
 
-func (s *StompProtocol) startAgentBareMetal(id string, pre, br, dir string) {
+func (s *StompProtocol) startAgentBareMetal(id string, pre, dir string, logger io.Writer) {
 	configFile := createStompFileConfig(id, pre, dir, *s)
 	dbFile := dir + "/db-" + pre + "-" + id + ".db"
 
@@ -152,7 +153,7 @@ Device.LocalAgent.EndpointID "`+pre+"-"+id+`-stomp"
 #
 # The following parameters will definitely need modifying
 #
-Device.LocalAgent.Controller.1.EndpointID "oktopusController"
+Device.LocalAgent.Controller.1.EndpointID "proto::oktopus"
 Device.STOMP.Connection.1.Host "`+s.Addr+`"
 Device.STOMP.Connection.1.Username "`+s.User+`"
 Device.STOMP.Connection.1.Password "`+s.Passwd+`"

@@ -1,0 +1,1 @@
+go run -o simulator cmd/main.go

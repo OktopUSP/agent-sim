@@ -32,3 +32,6 @@ go.work
 
 # binary generated file
 agent-sim
+
+# Log files
+*.log

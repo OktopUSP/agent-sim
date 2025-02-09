@@ -2,6 +2,7 @@ package simulator
 
 import (
 	"context"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -43,7 +44,7 @@ func newWs(c config.Config) WsProtocol {
 	}
 }
 
-func (w *WsProtocol) startAgentBareMetal(id, pre, br, dir string) {
+func (w *WsProtocol) startAgentBareMetal(id, pre, dir string, logger io.Writer) {
 	configFile := createWsFileConfig(id, pre, dir, *w)
 	dbFile := dir + "/db-" + pre + "-" + id + ".db"
 

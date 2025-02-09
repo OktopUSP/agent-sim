@@ -2,6 +2,7 @@ package simulator
 
 import (
 	"context"
+	"io"
 	"log"
 	"log/slog"
 	"os"
@@ -15,15 +16,16 @@ import (
 )
 
 type MqttProtocol struct {
-	Addr      string
-	Port      string
-	User      string
-	Pass      string
-	Ssl       bool
-	Wg        *sync.WaitGroup
-	Ctx       context.Context
-	Cli       *client.Client
-	BareMetal config.BareMetal
+	Addr       string
+	Port       string
+	User       string
+	Pass       string
+	Ssl        bool
+	Wg         *sync.WaitGroup
+	Ctx        context.Context
+	Cli        *client.Client
+	BareMetal  config.BareMetal
+	ProtoTrace bool
 }
 
 func newMqtt(c config.Config) MqttProtocol {
@@ -49,14 +51,19 @@ func newMqtt(c config.Config) MqttProtocol {
 		Pass: c.Mqtt.Pass,
 		Ssl:  c.Mqtt.Ssl,
 		/* -------------------------------------------------------------------------- */
-		Ctx:       c.Ctx,
-		Wg:        c.Wg,
-		Cli:       c.Docker.Cli,
-		BareMetal: c.BareMetal,
+		Ctx:        c.Ctx,
+		Wg:         c.Wg,
+		Cli:        c.Docker.Cli,
+		BareMetal:  c.BareMetal,
+		ProtoTrace: c.ProtoTrace,
 	}
 }
 
-func (m *MqttProtocol) startAgentBareMetal(id, pre, br, dir string) {
+func (m *MqttProtocol) startAgentBareMetal(
+	id,
+	pre,
+	dir string,
+	logger io.Writer) {
 
 	configFile := createMqttFileConfig(id, pre, dir, *m)
 	dbFile := dir + "/db-" + pre + "-" + id + ".db"
@@ -67,12 +74,15 @@ func (m *MqttProtocol) startAgentBareMetal(id, pre, br, dir string) {
 	}
 
 	args := []string{
-		"-p",
 		"-v", "4",
 		"-r", configFile,
 		"-f", dbFile,
 		"-i", m.BareMetal.EthernetInterface,
 		"-s", tempDir,
+	}
+
+	if m.ProtoTrace {
+		args = append(args, "-p")
 	}
 
 	if m.Ssl {
@@ -82,10 +92,8 @@ func (m *MqttProtocol) startAgentBareMetal(id, pre, br, dir string) {
 	}
 
 	cmd := exec.CommandContext(m.Ctx, m.BareMetal.ExecutablePath, args...)
-
-	if m.BareMetal.LogToStdout {
-		cmd.Stdout = os.Stdout
-	}
+	cmd.Stdout = logger
+	cmd.Stderr = logger
 
 	err = cmd.Start()
 	if err != nil {
@@ -151,8 +159,7 @@ func (m *MqttProtocol) startAgentDocker(id string, pre string, br string, dir st
 }
 
 func createMqttFileConfig(id string, pre, dir string, m MqttProtocol) string {
-	//TODO: create ssl agent option
-	//TODO: create mqqt client version
+	//TODO: create mqtt client version
 	err := os.WriteFile(
 		dir+"/"+pre+"-"+id+"-mqtt.txt",
 		[]byte(`

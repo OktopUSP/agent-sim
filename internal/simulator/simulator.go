@@ -1,6 +1,7 @@
 package simulator
 
 import (
+	"io"
 	"log"
 	"log/slog"
 	"os"
@@ -12,7 +13,7 @@ import (
 
 type agentSim interface {
 	startAgentDocker(string, string, string, string)
-	startAgentBareMetal(string, string, string, string)
+	startAgentBareMetal(string, string, string, io.Writer)
 }
 
 type mtp int
@@ -27,27 +28,20 @@ const DEFAULT_DIR = "/configs"
 
 func StartDeviceSimulator(c config.Config) {
 
-	mtp := getMtp(c.Mtp)
-	fileConfigDir := getDir(c.Path)
-
-	agent_sim := getAgentSim(mtp, c)
+	/* ------------------------------ config parser ----------------------------- */
+	mtp := getMtp(c.Mtp)                                                  // Parse the MTP to be used
+	fileConfigDir := getConfigDir(c.Path)                                 // Defines where the config files for OBUSPA are
+	logger := getLogger(c.BareMetal.LogToStdout, c.BareMetal.FileLogging) // Defines where the log goes to
+	agent_sim := getAgentSim(mtp, c)                                      // Creates the Agent Simulator interface
+	/* -------------------------------------------------------------------------- */
 
 	stopCounting := c.SimNumber + c.NumToStartId
-
-	if c.BrName == "" {
-		log.Println("Bridge name not defined")
-		c.BrName = "br"
-	}
-
-	j := 0
-	br := 0
 
 	if c.BareMetal.Enable {
 		slog.Info("Starting bare metal agent(s)", "number", c.SimNumber)
 		for i := c.NumToStartId; i < stopCounting; i++ {
 			c.Wg.Add(1)
-			go agent_sim.startAgentBareMetal(strconv.Itoa(i), c.Prefix, c.BrName, fileConfigDir)
-			// time.Sleep(time.Duration(100) * time.Millisecond)
+			go agent_sim.startAgentBareMetal(strconv.Itoa(i), c.Prefix, fileConfigDir, logger)
 		}
 		slog.Info("Bare metal agent(s) started")
 
@@ -58,6 +52,14 @@ func StartDeviceSimulator(c config.Config) {
 			log.Fatal(err)
 		}
 
+		if c.BrName == "" {
+			log.Println("Bridge name not defined")
+			c.BrName = "br"
+		}
+
+		j := 0
+		br := 0
+
 		for i := c.NumToStartId; i < stopCounting; i++ {
 			c.Wg.Add(1)
 			j++
@@ -67,7 +69,6 @@ func StartDeviceSimulator(c config.Config) {
 				j = 0
 			}
 			go agent_sim.startAgentDocker(strconv.Itoa(i), c.Prefix, c.BrName, fileConfigDir)
-			// time.Sleep(time.Duration(100) * time.Millisecond)
 		}
 
 	}
@@ -79,14 +80,22 @@ func getAgentSim(mtp mtp, c config.Config) agentSim {
 	case Mqtt:
 		mqtt := newMqtt(c)
 		return &mqtt
+	// TODO: Compatibilize STOMP and websockets with the new agent-sim
 	case Stomp:
-		stomp := newStomp(c)
-		return &stomp
+		slog.Info("Stomp not implemented yet")
+		os.Exit(0)
+		return nil
+		// stomp := newStomp(c)
+		// return &stomp
 	case Websockets:
-		ws := newWs(c)
-		return &ws
+		slog.Info("Websockets not implemented yet")
+		os.Exit(0)
+		return nil
+		// ws := newWs(c)
+		// return &ws
 	default:
-		log.Fatal("Invalid MTP")
+		slog.Info("Invalid MTP")
+		os.Exit(0)
 		return nil
 	}
 }
@@ -103,22 +112,22 @@ func getMtp(mtp_config string) mtp {
 	case "websockets":
 		mtp = Websockets
 	case "":
-		log.Println("MTP not defined")
+		slog.Error("MTP not defined", "mtp", mtp_config)
 		os.Exit(1)
 	default:
-		log.Println("Invalid MTP")
+		slog.Error("Invalid MTP", "mtp", mtp_config)
 		os.Exit(1)
 	}
 
 	return mtp
 }
 
-func getDir(path string) string {
+func getConfigDir(path string) string {
 
 	checkPathExists := func(dir string) {
 		_, err := os.Stat(dir)
 		if err != nil {
-			log.Printf("Path: %s does not exist", path)
+			slog.Error("Path does not exist", "path", dir, "error", err)
 			os.Exit(1)
 		}
 	}
@@ -126,12 +135,44 @@ func getDir(path string) string {
 	if path == "" {
 		path, _ = os.Getwd()
 		path = path + DEFAULT_DIR
-		log.Printf(
-			"Path not defined, using current directory: %s",
-			path,
-		)
+		slog.Warn("Config path not defined, using default", "path", path)
+		return path
 	}
 
 	checkPathExists(path)
 	return path
+}
+
+func getLogger(logToStdout bool, fileLogging config.FileLogging) io.Writer {
+
+	if logToStdout && !fileLogging.Enable {
+		return os.Stdout
+	}
+
+	if logToStdout && fileLogging.Enable {
+		return io.MultiWriter(os.Stdout, getLogFile(fileLogging.LogFolder))
+	}
+
+	if !logToStdout && fileLogging.Enable {
+		return getLogFile(fileLogging.LogFolder)
+	}
+
+	return nil
+}
+
+func getLogFile(folder string) *os.File {
+
+	if folder == "" {
+		folder, _ = os.Getwd()
+		folder = folder + DEFAULT_DIR
+		slog.Warn("Logs folder path not defined, using default", "path", folder)
+	}
+
+	logFile, err := os.OpenFile(folder+"/oktopus-agents.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666) //TODO: tis log file config should be a file instead of a folder
+	if err != nil {
+		slog.Error("Error to open log file", "error", err)
+	}
+
+	// logFile.Close()
+	return logFile
 }
