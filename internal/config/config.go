@@ -16,20 +16,21 @@ import (
 )
 
 type Config struct {
-	SimNumber    int
-	NumToStartId int
-	Prefix       string
-	Mtp          string
-	Path         string
-	Ctx          context.Context
-	Wg           *sync.WaitGroup
-	Docker       Docker
-	BrName       string
-	Mqtt         Mqtt
-	WebSockets   WebSockets
-	Stomp        Stomp
-	BareMetal    BareMetal
-	ProtoTrace   bool
+	SimNumber     int
+	NumToStartId  int
+	Prefix        string
+	Mtp           string
+	Path          string
+	Ctx           context.Context
+	Wg            *sync.WaitGroup
+	Docker        Docker
+	BrName        string
+	Mqtt          Mqtt
+	WebSockets    WebSockets
+	Stomp         Stomp
+	BareMetal     BareMetal
+	ProtoTrace    bool
+	EnableMonitor bool
 }
 
 type BareMetal struct {
@@ -125,6 +126,7 @@ func NewConfig(ctx context.Context) Config {
 	flImgPath := flag.String("imgpath", utils.LookupEnvOrString("DOCKERFILE_PATH", ""), "Path to Dockerfile")
 	flProtoTrace := flag.Bool("proto_trace", utils.LookupEnvOrBool("PROTO_TRACE", false), "Enable OBUSPA protobuffer tracing")
 	flPrefix := flag.String("prefix", utils.LookupEnvOrString("PREFIX", "oktopus"), "Prefix of device id")
+	flEnableMonitor := flag.Bool("enable_monitor", utils.LookupEnvOrBool("ENABLE_MONITOR", false), "Enable process monitoring")
 	flHelp := flag.Bool("help", false, "Help")
 
 	setupLogging(*flLogLevel, *mainProcessLogFile)
@@ -153,14 +155,15 @@ func NewConfig(ctx context.Context) Config {
 	}
 
 	return Config{
-		SimNumber:    *flSimNum,
-		NumToStartId: *flNumToStartIds,
-		Prefix:       *flPrefix,
-		Mtp:          *flMtp,
-		Path:         *flPath,
-		Wg:           &sync.WaitGroup{},
-		ProtoTrace:   *flProtoTrace,
-		Ctx:          ctx,
+		SimNumber:     *flSimNum,
+		NumToStartId:  *flNumToStartIds,
+		Prefix:        *flPrefix,
+		Mtp:           *flMtp,
+		Path:          *flPath,
+		Wg:            &sync.WaitGroup{},
+		ProtoTrace:    *flProtoTrace,
+		Ctx:           ctx,
+		EnableMonitor: *flEnableMonitor,
 		Docker: Docker{
 			Cli:     cli,
 			ImgPath: *flImgPath,

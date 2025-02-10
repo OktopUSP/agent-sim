@@ -63,7 +63,9 @@ func (m *MqttProtocol) startAgentBareMetal(
 	id,
 	pre,
 	dir string,
-	logger io.Writer) {
+	logger io.Writer,
+	pid chan int,
+) {
 
 	configFile := createMqttFileConfig(id, pre, dir, *m)
 	dbFile := dir + "/db-" + pre + "-" + id + ".db"
@@ -97,9 +99,12 @@ func (m *MqttProtocol) startAgentBareMetal(
 
 	err = cmd.Start()
 	if err != nil {
-		slog.Error("Error to start OBUSPA:", "error", err, "id", id)
+		slog.Error("Error to start OBUSPA:", "error", err, "id", id, "pid", cmd.Process.Pid)
+	} else {
+		slog.Debug("agent started", "id", id, "pid", cmd.Process.Pid)
 	}
-	slog.Debug("agent started", "id", id)
+
+	pid <- cmd.Process.Pid
 
 	err = cmd.Wait()
 	if err != nil {

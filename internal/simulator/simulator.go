@@ -13,7 +13,7 @@ import (
 
 type agentSim interface {
 	startAgentDocker(string, string, string, string)
-	startAgentBareMetal(string, string, string, io.Writer)
+	startAgentBareMetal(string, string, string, io.Writer, chan int)
 }
 
 type mtp int
@@ -37,13 +37,24 @@ func StartDeviceSimulator(c config.Config) {
 
 	stopCounting := c.SimNumber + c.NumToStartId
 
+	pid := make(chan int, c.SimNumber)
+
 	if c.BareMetal.Enable {
 		slog.Info("Starting bare metal agent(s)", "number", c.SimNumber)
 		for i := c.NumToStartId; i < stopCounting; i++ {
 			c.Wg.Add(1)
-			go agent_sim.startAgentBareMetal(strconv.Itoa(i), c.Prefix, fileConfigDir, logger)
+			go agent_sim.startAgentBareMetal(strconv.Itoa(i), c.Prefix, fileConfigDir, logger, pid)
 		}
 		slog.Info("Bare metal agent(s) started")
+
+		if c.EnableMonitor {
+			pids := make([]int, c.SimNumber)
+			for i := 0; i < c.SimNumber; i++ {
+				pids[i] = <-pid
+			}
+			slog.Debug("Process monitor list", "pids", pids)
+			monitorProcesses(pids)
+		}
 
 	} else {
 
