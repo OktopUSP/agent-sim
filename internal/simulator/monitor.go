@@ -29,14 +29,17 @@ func monitorProcesses(pids []int) {
 			cpuPercent, err := proc.CPUPercent()
 			if err != nil {
 				slog.Error("Error getting CPU percent", "pid", proc.Pid, "error", err)
+				continue
 			}
 			memInfo, err := proc.MemoryInfo()
 			if err != nil {
 				slog.Error("Error getting memory info", "pid", proc.Pid, "error", err)
+				continue
 			}
 			connections, err := net.ConnectionsPid("tcp", proc.Pid)
 			if err != nil {
 				slog.Error("Error getting tcp connections", "pid", proc.Pid, "error", err)
+				continue
 			}
 			numConnections := len(connections)
 
