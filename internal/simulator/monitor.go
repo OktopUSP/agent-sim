@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/shirou/gopsutil/process"
+	"github.com/shirou/gopsutil/v3/net"
 )
 
 func monitorProcesses(pids []int) {
@@ -22,6 +23,7 @@ func monitorProcesses(pids []int) {
 	for {
 		var totalCPU float64
 		var totalMemory uint64
+		var totalConnections int
 
 		for _, proc := range processList {
 			cpuPercent, err := proc.CPUPercent()
@@ -32,20 +34,28 @@ func monitorProcesses(pids []int) {
 			if err != nil {
 				slog.Error("Error getting memory info", "pid", proc.Pid, "error", err)
 			}
+			connections, err := net.ConnectionsPid("tcp", proc.Pid)
+			if err != nil {
+				slog.Error("Error getting tcp connections", "pid", proc.Pid, "error", err)
+			}
+			numConnections := len(connections)
 
 			slog.Debug("Process stats",
 				slog.Int("pid", int(proc.Pid)),
 				slog.Float64("cpu_percent", cpuPercent),
 				slog.Uint64("memory_kb", memInfo.RSS/(1024*1024)),
+				slog.Int("connections", numConnections),
 			)
 
 			totalCPU += cpuPercent
 			totalMemory += memInfo.RSS / (1024 * 1024)
+			totalConnections += numConnections
 		}
 
 		slog.Info("Total compute resources usage",
-			slog.Float64("total_cpu_percent", totalCPU),
-			slog.Uint64("total_memory_mb", totalMemory),
+			slog.Float64("cpu_percent", totalCPU),
+			slog.Uint64("memory_mb", totalMemory),
+			slog.Int("tcp_connections", totalConnections),
 		)
 
 		time.Sleep(1 * time.Second)
