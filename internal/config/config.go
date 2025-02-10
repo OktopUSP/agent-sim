@@ -94,6 +94,7 @@ func NewConfig(ctx context.Context) Config {
 	//TODO: folders/paths/files consig to work in a similar way
 	//TODO: dynamic configure obuspa log verbosity level
 
+	mainProcessLogFile := flag.String("main_process_log_file", utils.LookupEnvOrString("MAIN_PROCESS_LOG_FILE", ""), "Main ulation process log file")
 	flSimNum := flag.Int("sim_number", utils.LookupEnvOrInt("SIM_NUM", 1), "Number of simulated devices")
 	flNumToStartIds := flag.Int("num_to_start_ids", utils.LookupEnvOrInt("NUM_TO_START_IDS", 0), "From where to start your IDs")
 	flMtp := flag.String("protocol", utils.LookupEnvOrString("MTP", ""), "MTP to use (mqtt, stomp, websockets)")
@@ -126,11 +127,7 @@ func NewConfig(ctx context.Context) Config {
 	flPrefix := flag.String("prefix", utils.LookupEnvOrString("PREFIX", "oktopus"), "Prefix of device id")
 	flHelp := flag.Bool("help", false, "Help")
 
-	slog.SetDefault(
-		slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-			Level: getLogLevel(*flLogLevel),
-		})),
-	)
+	setupLogging(*flLogLevel, *mainProcessLogFile)
 
 	flag.Parse()
 
@@ -217,4 +214,21 @@ func getLogLevel(leveStr string) slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+func setupLogging(logLevel string, logFile string) {
+	var logWriter io.Writer = os.Stdout
+	if logFile != "" {
+		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			slog.Error("Failed to open log file:", "error", err)
+			os.Exit(1)
+		}
+		logWriter = io.MultiWriter(os.Stdout, file)
+	}
+	slog.SetDefault(
+		slog.New(slog.NewJSONHandler(logWriter, &slog.HandlerOptions{
+			Level: getLogLevel(logLevel),
+		})),
+	)
 }
