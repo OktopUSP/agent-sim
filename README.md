@@ -113,6 +113,37 @@ To stop and remove all containers type **ctrl+c**:
 2025/09/09 16:04:50 main.go:121: (⌐■_■) Agent simulator is out!
 ```
 
+**ENV files examples**
+
+You can also set flags using the **.env** file. For example: 
+
+Running 100 simulated mqtt clients:
+
+Set necessary flags inside the .env file:
+```txt
+SIM_NUM="100"
+NUM_TO_START_IDS=""
+MTP="mqtt"
+PREFIX=""
+MQTT_USER="mqttuser"
+MQTT_PASSWd="mqttpass"
+MQTT_PORT="1883"
+MQTT_ADDR="192.168.10.159"
+WS_ROUTE=""
+WS_ADDR=""
+PATH="/home/apps/agent-sim/configs/"
+DOCKERFILE_PATH="./Dockerfile"
+MTP="mqtt" #options = mqtt, websockets or stomp
+```
+
+After flags are set in the .env file you can run the simulator using the bellow command:
+
+```shell
+go run cmd/main.go 
+```
+
+**Controller View**
+
 After running the agent simulator you can view them at the Devices page from the Oktopus controller:
 
 ![alt text](/img/devices.png)
